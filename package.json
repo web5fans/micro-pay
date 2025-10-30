@@ -1,0 +1,32 @@
+{
+  "name": "micro-pay",
+  "version": "1.0.0",
+  "description": "A micro-payment service for CKB",
+  "main": "dist/index.js",
+  "scripts": {
+    "start": "ts-node src/index.ts",
+    "build": "tsc",
+    "serve": "node dist/index.js"
+  },
+  "keywords": [
+    "ckb",
+    "payment"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@ckb-ccc/core": "^1.12.2",
+    "dotenv": "^16.3.1",
+    "express": "^5.1.0",
+    "pg": "^8.16.3",
+    "@scure/bip32": "^2.0.1",
+    "@scure/bip39": "^2.0.1"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.5",
+    "@types/node": "^24.9.2",
+    "@types/pg": "^8.15.6",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
+  }
+}
