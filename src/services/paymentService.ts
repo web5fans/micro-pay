@@ -16,7 +16,8 @@ export async function preparePayment(
   senderAddress: string,
   receiverAddress: string,
   amount: number,
-  splitReceivers: SplitReceiver[] = []
+  splitReceivers: SplitReceiver[] = [],
+  info: string | null = null
 ) {
   try {
     // 使用事务确保数据库操作的原子性
@@ -47,20 +48,22 @@ export async function preparePayment(
         senderAddress,
         receiverAddress,
         platformAddressRecord.index,
-        amount
+        amount,
+        info
       );
 
       // 5. 创建分账记录
       for (const receiver of splitReceivers) {
         const splitAmount = Math.floor(amount * receiver.splitRate / 100);
-        await createAccountWithTransaction(client, payment.id, receiver.address, splitAmount);
+        await createAccountWithTransaction(client, payment.id, receiver.address, splitAmount, info);
       }
 
       await createAccountWithTransaction(
         client, 
         payment.id, 
         receiverAddress, 
-        Math.floor(amount * receiverSplitRate / 100)
+        Math.floor(amount * receiverSplitRate / 100),
+        info
       );
 
       return {

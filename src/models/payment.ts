@@ -7,10 +7,11 @@ export interface Payment {
   receiver: string;
   platform_address_index: number;
   amount: number;
-  created_at: Date;
-  updated_at: Date;
+  info: string | null;
   is_complete: boolean;
   tx_hash: string | null;
+  created_at: Date;
+  updated_at: Date;
 }
 
 export async function createPayment(
@@ -18,14 +19,14 @@ export async function createPayment(
   receiver: string,
   platform_address_index: number,
   amount: number,
+  info: string | null = null, 
   txHash: string | null = null
 ): Promise<Payment> {
-  const timeNow = new Date().toISOString();
   const result = await query(
-    `INSERT INTO payment (sender, receiver, platform_address_index, amount, created_at, updated_at, is_complete, tx_hash)
-     VALUES ($1, $2, $3, $4, $5, $6, false, $7)
+    `INSERT INTO payment (sender, receiver, platform_address_index, amount, info, is_complete, tx_hash)
+     VALUES ($1, $2, $3, $4, $5, false, $6)
      RETURNING *`,
-    [sender, receiver, platform_address_index, amount, timeNow, timeNow, txHash]
+    [sender, receiver, platform_address_index, amount, info, txHash]
   );
   
   return result.rows[0];
@@ -37,14 +38,14 @@ export async function createPaymentWithTransaction(
   sender: string,
   receiver: string,
   platform_address_index: number,
-  amount: number
+  amount: number,
+  info: string | null = null
 ) {
-  const timeNow = new Date().toISOString();
   const result = await client.query(
-    `INSERT INTO payment (sender, receiver, platform_address_index, amount, created_at, updated_at, is_complete, tx_hash)
-     VALUES ($1, $2, $3, $4, $5, $6, false, $7)
+    `INSERT INTO payment (sender, receiver, platform_address_index, amount, info, is_complete, tx_hash)
+     VALUES ($1, $2, $3, $4, $5, false, $6)
      RETURNING *`,
-    [sender, receiver, platform_address_index, amount, timeNow, timeNow, null]
+    [sender, receiver, platform_address_index, amount, info, null]
   );
   
   return result.rows[0];

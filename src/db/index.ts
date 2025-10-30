@@ -43,10 +43,11 @@ export async function initDb() {
         receiver TEXT NOT NULL,
         platform_address_index INTEGER NOT NULL,
         amount BIGINT NOT NULL,
-        created_at TIMESTAMP NOT NULL,
-        updated_at TIMESTAMP NOT NULL,
+        info TEXT,
         is_complete BOOLEAN NOT NULL DEFAULT false,
-        tx_hash TEXT
+        tx_hash TEXT,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMP NOT NULL DEFAULT NOW()
       )
     `, []);
     
@@ -57,10 +58,11 @@ export async function initDb() {
         payment_id INTEGER NOT NULL REFERENCES payment(id),
         receiver TEXT NOT NULL,
         amount BIGINT NOT NULL,
-        created_at TIMESTAMP NOT NULL,
-        updated_at TIMESTAMP NOT NULL,
+        info TEXT,
         is_payed BOOLEAN NOT NULL DEFAULT false,
-        tx_hash TEXT
+        tx_hash TEXT,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMP NOT NULL DEFAULT NOW()
       )
     `, []);
     

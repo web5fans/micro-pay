@@ -9,7 +9,7 @@ export const paymentRouter = express.Router();
 paymentRouter.post('/prepare', async (req: Request, res: Response) => {
   try {
     console.log('Request body:', req.body);
-    const { sender, receiver, amount, splitReceivers } = req.body;
+    const { sender, receiver, amount, splitReceivers, info } = req.body;
     
     // 验证请求参数
     if (!sender || !receiver || !amount) {
@@ -32,7 +32,7 @@ paymentRouter.post('/prepare', async (req: Request, res: Response) => {
     }
     
     // 准备支付
-    const result = await preparePayment(sender, receiver, amount, splitReceivers);
+    const result = await preparePayment(sender, receiver, amount, splitReceivers, info);
     
     res.json(result);
   } catch (error) {
@@ -75,8 +75,11 @@ paymentRouter.get('/:id', async (req: Request, res: Response) => {
     // 获取分账记录
     const accounts = await getAccountsByPaymentId(paymentId);
     
+    // 从 payment 对象中移除 platform_address_index 字段
+    const { platform_address_index, ...paymentWithoutIndex } = payment;
+    
     res.json({
-      payment,
+      payment: paymentWithoutIndex,
       accounts
     });
   } catch (error) {
@@ -93,7 +96,13 @@ paymentRouter.get('/sender/:address', async (req: Request, res: Response) => {
     // 获取支付记录
     const payments = await getPaymentsBySender(address);
     
-    res.json(payments);
+    // 从每个支付记录中移除 platform_address_index 字段
+    const paymentsWithoutIndex = payments.map(payment => {
+      const { platform_address_index, ...paymentWithoutIndex } = payment;
+      return paymentWithoutIndex;
+    });
+    
+    res.json(paymentsWithoutIndex);
   } catch (error) {
     console.error('Error in get payments by sender endpoint:', error);
     res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });

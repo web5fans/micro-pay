@@ -6,22 +6,24 @@ export interface Account {
   payment_id: number;
   receiver: string;
   amount: number;
-  created_at: Date;
-  updated_at: Date;
+  info: string | null;
   is_payed: boolean;
   tx_hash: string | null;
+  created_at: Date;
+  updated_at: Date;
 }
 
 export async function createAccount(
   payment_id: number,
   receiver: string,
-  amount: number
+  amount: number,
+  info: string | null = null
 ): Promise<Account> {
   const result = await query(
-    `INSERT INTO account (payment_id, receiver, amount, created_at, updated_at, is_payed)
-     VALUES ($1, $2, $3, NOW(), NOW(), false)
+    `INSERT INTO account (payment_id, receiver, amount, info)
+     VALUES ($1, $2, $3, $4) 
      RETURNING *`,
-    [payment_id, receiver, amount]
+    [payment_id, receiver, amount, info]
   );
   
   return result.rows[0];
@@ -32,13 +34,14 @@ export async function createAccountWithTransaction(
   client: PoolClient,
   payment_id: number,
   receiver: string,
-  amount: number
+  amount: number,
+  info: string | null = null
 ) {
   const result = await client.query(
-    `INSERT INTO account (payment_id, receiver, amount, created_at, updated_at, is_payed)
-     VALUES ($1, $2, $3, NOW(), NOW(), false)
+    `INSERT INTO account (payment_id, receiver, amount, info)
+     VALUES ($1, $2, $3, $4) 
      RETURNING *`,
-    [payment_id, receiver, amount]
+    [payment_id, receiver, amount, info]
   );
   
   return result.rows[0];

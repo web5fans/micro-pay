@@ -79,10 +79,11 @@ CREATE TABLE IF NOT EXISTS payment(
     receiver TEXT,
     platform_address_index INTEGER,
     amount BIGINT,
-    created_at TIMESTAMP,
-    updated_at TIMESTAMP,
+    info TEXT,
     is_complete BOOLEAN,
     tx_hash TEXT,
+    created_at TIMESTAMP,
+    updated_at TIMESTAMP,
 );
 ```
 
@@ -98,10 +99,11 @@ CREATE TABLE IF NOT EXISTS account(
     payment_id BIGINT,
     receiver TEXT,
     amount BIGINT,
-    created_at TIMESTAMP,
-    updated_at TIMESTAMP,
+    info TEXT,
     is_payed BOOLEAN,
     tx_hash TEXT,
+    created_at TIMESTAMP,
+    updated_at TIMESTAMP,
 );
 ```
 
@@ -116,7 +118,7 @@ CREATE TABLE IF NOT EXISTS account(
 平台需要提供 2 个 API 接口，用于发送者发送转账请求。
 
 - 转账准备接口。
-  发送者调用该接口，请求包含发送者地址，接收者地址，转账金额和一个包含分账者地址及分账百分比的数组。
+  发送者调用该接口，请求包含发送者地址，接收者地址，转账金额和一个包含分账者地址及分账百分比的数组，以及一个可选的 info 字段。
   平台首先根据发送者地址，和从多个平台地址中挑选一个未使用的地址，以及转账金额组装 2-2 支付交易。
   记录支付信息并得到一个支付 id，记录接收者和分账者的分账信息。
   返回包含支付 id，未签名的2-2 交易的 raw tx，以及 2-2 交易的 hash。
@@ -128,9 +130,9 @@ CREATE TABLE IF NOT EXISTS account(
 
 查询交易记录接口包括：
 
-- 根据支付 id 查询支付记录，包含支付者地址，接收者地址，转账金额，交易 hash，交易状态等以及分账记录。
-- 根据发送者地址查询支付记录，包含支付 id，接收者地址，转账金额, 交易 hash，交易状态。
-- 根据接收者地址查询分账记录，包含分账id，支付 id，接收者地址，金额, 交易 hash，是否支付。
+- 根据支付 id 查询支付记录，包含支付者地址，接收者地址，转账金额，info, 交易 hash，交易状态等以及分账记录。
+- 根据发送者地址查询支付记录，包含支付 id，接收者地址，转账金额, info, 交易 hash，交易状态。
+- 根据接收者地址查询分账记录，包含分账id，支付 id，接收者地址，金额, info, 交易 hash，是否支付。
 
 ## 运行
 
@@ -173,7 +175,8 @@ curl -X POST http://localhost:3000/api/payment/prepare \
         "address": "ckb_address_split2",
         "splitRate": 20
       }
-    ]
+    ],
+    "info": "post_id"
   }'
 ```
 响应
@@ -219,7 +222,7 @@ curl -X POST http://localhost:3000/api/payment/prepare \
             "0x"
         ]
     },
-    "txHash": "0x6d6f636b5f74785f686173685f31373631383033303134373732"
+    "txHash": "0x6d6f636b5f74785f686173685f31373631383038393331373239"
 }
 ```
 
@@ -234,7 +237,11 @@ curl -X POST http://localhost:3000/api/payment/transfer \
 ```
 响应
 ```
-{"paymentId":"1","txHash":"0x6d6f636b5f74785f686173685f73656e745f31373631383032343435373038","status":"completed"}
+{
+    "paymentId": "1",
+    "txHash": "0x6d6f636b5f74785f686173685f73656e745f31373631383039303938353335",
+    "status": "completed"
+}
 ```
 
 4. 根据支付id查询支付记录
@@ -248,12 +255,12 @@ curl -X GET http://localhost:3000/api/payment/1
         "id": 1,
         "sender": "ckb_address_sender",
         "receiver": "ckb_address_receiver",
-        "platform_address_index": 0,
         "amount": "100000000",
-        "created_at": "2025-10-29T21:43:34.772Z",
-        "updated_at": "2025-10-29T21:44:10.005Z",
+        "info": "post_id",
         "is_complete": true,
-        "tx_hash": "0x6d6f636b5f74785f686173685f73656e745f31373631383033303530303035"
+        "tx_hash": "0x6d6f636b5f74785f686173685f73656e745f31373631383039303938353335",
+        "created_at": "2025-10-29T23:22:11.727Z",
+        "updated_at": "2025-10-29T23:24:58.535Z"
     },
     "accounts": [
         {
@@ -261,30 +268,33 @@ curl -X GET http://localhost:3000/api/payment/1
             "payment_id": 1,
             "receiver": "ckb_address_split1",
             "amount": "10000000",
-            "created_at": "2025-10-29T21:43:34.770Z",
-            "updated_at": "2025-10-29T21:43:34.770Z",
+            "info": "post_id",
             "is_payed": false,
-            "tx_hash": null
+            "tx_hash": null,
+            "created_at": "2025-10-29T23:22:11.727Z",
+            "updated_at": "2025-10-29T23:22:11.727Z"
         },
         {
             "id": 2,
             "payment_id": 1,
             "receiver": "ckb_address_split2",
             "amount": "20000000",
-            "created_at": "2025-10-29T21:43:34.770Z",
-            "updated_at": "2025-10-29T21:43:34.770Z",
+            "info": "post_id",
             "is_payed": false,
-            "tx_hash": null
+            "tx_hash": null,
+            "created_at": "2025-10-29T23:22:11.727Z",
+            "updated_at": "2025-10-29T23:22:11.727Z"
         },
         {
             "id": 3,
             "payment_id": 1,
             "receiver": "ckb_address_receiver",
             "amount": "70000000",
-            "created_at": "2025-10-29T21:43:34.770Z",
-            "updated_at": "2025-10-29T21:43:34.770Z",
+            "info": "post_id",
             "is_payed": false,
-            "tx_hash": null
+            "tx_hash": null,
+            "created_at": "2025-10-29T23:22:11.727Z",
+            "updated_at": "2025-10-29T23:22:11.727Z"
         }
     ]
 }
@@ -301,12 +311,12 @@ curl -X GET http://localhost:3000/api/payment/sender/ckb_address_sender
         "id": 1,
         "sender": "ckb_address_sender",
         "receiver": "ckb_address_receiver",
-        "platform_address_index": 0,
         "amount": "100000000",
-        "created_at": "2025-10-29T21:43:34.772Z",
-        "updated_at": "2025-10-29T21:44:10.005Z",
+        "info": "post_id",
         "is_complete": true,
-        "tx_hash": "0x6d6f636b5f74785f686173685f73656e745f31373631383033303530303035"
+        "tx_hash": "0x6d6f636b5f74785f686173685f73656e745f31373631383039303938353335",
+        "created_at": "2025-10-29T23:22:11.727Z",
+        "updated_at": "2025-10-29T23:24:58.535Z"
     }
 ]
 ``` 
@@ -323,10 +333,11 @@ curl -X GET http://localhost:3000/api/payment/receiver/ckb_address_receiver
         "payment_id": 1,
         "receiver": "ckb_address_receiver",
         "amount": "70000000",
-        "created_at": "2025-10-29T21:43:34.770Z",
-        "updated_at": "2025-10-29T21:43:34.770Z",
+        "info": "post_id",
         "is_payed": false,
-        "tx_hash": null
+        "tx_hash": null,
+        "created_at": "2025-10-29T23:22:11.727Z",
+        "updated_at": "2025-10-29T23:22:11.727Z"
     }
 ]
 ``` 
