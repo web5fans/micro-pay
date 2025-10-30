@@ -119,17 +119,18 @@ CREATE TABLE IF NOT EXISTS account(
   发送者调用该接口，请求包含发送者地址，接收者地址，转账金额和一个包含分账者地址及分账百分比的数组。
   平台首先根据发送者地址，和从多个平台地址中挑选一个未使用的地址，以及转账金额组装 2-2 支付交易。
   记录支付信息并得到一个支付 id，记录接收者和分账者的分账信息。
-  返回包含支付 id，2-2 交易的 raw tx，以及 2-2 交易的 hash。
+  返回包含支付 id，未签名的2-2 交易的 raw tx，以及 2-2 交易的 hash。
 - 转账接口。
   发送者调用该接口，将部分签名的 2-2 支付交易发送给平台。
-  平台调用补全签名之后发送到链上。记录交易 hash，更新对应的支付记录状态为已完成。
+  平台调用对应的平台地址补全签名之后发送到链上。记录交易 hash，更新对应的支付记录状态为已完成。
 
 ### 查询接口
 
 查询交易记录接口包括：
 
 - 根据支付 id 查询支付记录，包含支付者地址，接收者地址，转账金额，交易 hash，交易状态等以及分账记录。
-- 根据发送者/接收者地址查询发送的支付记录，包含支付 id，接收者地址，转账金额, 交易 hash，交易状态。
+- 根据发送者地址查询支付记录，包含支付 id，接收者地址，转账金额, 交易 hash，交易状态。
+- 根据接收者地址查询分账记录，包含分账id，支付 id，接收者地址，金额, 交易 hash，是否支付。
 
 ## 运行
 
@@ -236,7 +237,7 @@ curl -X POST http://localhost:3000/api/payment/transfer \
 {"paymentId":"1","txHash":"0x6d6f636b5f74785f686173685f73656e745f31373631383032343435373038","status":"completed"}
 ```
 
-4. 根据支付id查询接口
+4. 根据支付id查询支付记录
 ```
 curl -X GET http://localhost:3000/api/payment/1
 ```
@@ -289,11 +290,9 @@ curl -X GET http://localhost:3000/api/payment/1
 }
 ``` 
 
-5. 发送者/接收者地址查询发送的支付记录
+5. 根据发送者地址查询发送的支付记录
 ``` 
 curl -X GET http://localhost:3000/api/payment/sender/ckb_address_sender
-
-curl -X GET http://localhost:3000/api/payment/receiver/ckb_address_receiver
 ```
 响应
 ```
@@ -308,6 +307,26 @@ curl -X GET http://localhost:3000/api/payment/receiver/ckb_address_receiver
         "updated_at": "2025-10-29T21:44:10.005Z",
         "is_complete": true,
         "tx_hash": "0x6d6f636b5f74785f686173685f73656e745f31373631383033303530303035"
+    }
+]
+``` 
+
+6. 根据接收者地址查询分账记录
+``` 
+curl -X GET http://localhost:3000/api/payment/receiver/ckb_address_receiver
+```
+响应
+```
+[
+    {
+        "id": 3,
+        "payment_id": 1,
+        "receiver": "ckb_address_receiver",
+        "amount": "70000000",
+        "created_at": "2025-10-29T21:43:34.770Z",
+        "updated_at": "2025-10-29T21:43:34.770Z",
+        "is_payed": false,
+        "tx_hash": null
     }
 ]
 ``` 

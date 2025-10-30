@@ -1,7 +1,7 @@
 import express, { Request, Response } from 'express';
 import { preparePayment, completeTransfer } from '../services/paymentService';
-import { getPaymentById, getPaymentsBySender, getPaymentsByReceiver, getAllPayments } from '../models/payment';
-import { getAccountsByPaymentId } from '../models/account';
+import { getPaymentById, getPaymentsBySender } from '../models/payment';
+import { getAccountsByPaymentId, getAccountsByReceiver } from '../models/account';
 
 export const paymentRouter = express.Router();
 
@@ -106,11 +106,11 @@ paymentRouter.get('/receiver/:address', async (req: Request, res: Response) => {
     const address = req.params.address;
     
     // 获取支付记录
-    const payments = await getPaymentsByReceiver(address);
+    const payments = await getAccountsByReceiver(address);
     
     res.json(payments);
   } catch (error) {
-    console.error('Error in get payments by receiver endpoint:', error);
+    console.error('Error in get accounts by receiver endpoint:', error);
     res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
   }
 });
