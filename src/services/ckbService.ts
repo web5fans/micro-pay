@@ -120,7 +120,10 @@ export async function build2to2Transaction(
     let sendSum = BigInt(0);
     const senderCells = [];
     for await (const cell of senderSigner.findCells(
-      {}, false, "asc", 10
+      {
+        scriptLenRange: [0, 1],
+        outputDataLenRange: [0, 1],
+      }, false, "asc", 10
     )) {
       sendSum += BigInt(cell.cellOutput.capacity);
       senderCells.push(cell);
@@ -212,15 +215,28 @@ export async function build2to2Transaction(
   }
 }
 
-// 发送交易到链上
-export async function sendTransaction(signedTx: any): Promise<string> {
-  // Mock实现，模拟发送交易
-  console.log('Mock: 发送交易到链上', JSON.stringify(signedTx).substring(0, 100) + '...');
-  
-  // 模拟交易哈希
-  const txHash = '0x' + Buffer.from(`mock_tx_hash_sent_${Date.now()}`).toString('hex');
-  
-  return txHash;
+export async function completeTransaction(platformAddressIndex: number, partSignedTx: string) {
+  try {
+    const txObj = JSON.parse(partSignedTx);
+
+    const tx = Transaction.from(txObj);
+
+    const platformPrivateKey = await getPrivateKey(platformAddressIndex);
+    const platformSigner = new ccc.SignerCkbPrivateKey(cccClient, platformPrivateKey);
+
+    // 完善交易并发送交易到链上
+    const signedTx = await platformSigner.signTransaction(tx);
+
+    // 发送交易到链上
+    const txHash = await platformSigner.sendTransaction(signedTx);
+    
+    return txHash;
+  } catch (error) {
+    if (error instanceof Error) {
+      console.error('Error completing transfer:', error.message);
+    }
+    throw error;
+  }
 }
 
 // 检查交易状态

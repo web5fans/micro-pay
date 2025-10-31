@@ -196,14 +196,14 @@ curl -X POST http://localhost:3000/api/payment/transfer \
   -H "Content-Type: application/json" \
   -d '{
     "payment_id": "1",
-    "signed_tx": "signed_transaction_hex_string"
+    "signed_tx": "{\"version\":\"0x0\",\"cellDeps\":[{\"outPoint\":{\"txHash\":\"0xf8de3bb47d055cdf460d93a2a6e1b05f7432f9777c8c474abf4eec1d4aee5d37\",\"index\":\"0x0\"},\"depType\":\"depGroup\"}],\"headerDeps\":[],\"inputs\":[{\"previousOutput\":{\"txHash\":\"0x38cccf9dfae31269c01574bd02f8afeef742d4b80ff17e905cd883461336d3a8\",\"index\":\"0x0\"},\"since\":\"0x0\",\"cellOutput\":{\"capacity\":\"0x4e3b29200\",\"lock\":{\"codeHash\":\"0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8\",\"hashType\":\"type\",\"args\":\"0xdc3ff72c77f90a034b69b593f6b339ced1d85de8\"},\"type\":{\"codeHash\":\"0x685a60219309029d01310311dba953d67029170ca4848a4ff638e57002130a0d\",\"hashType\":\"data1\",\"args\":\"0x5da8cebb6b75625a44e06c3b246e8297b7e6e0a30c6c329b34459bdef873e50c\"}},\"outputData\":\"0x5400000010000000190000003000000005000000646f622f30130000007b2022646e61223a202230783031363422207d200000001658c339f24c6a03af925537ec1d1650947c50c0f890e5dd1ea94721b28897e2\"},{\"previousOutput\":{\"txHash\":\"0xcd76398eaada6994c82cc4772d259a970a45e657352580ada0a25547531ac2a1\",\"index\":\"0x0\"},\"since\":\"0x0\",\"cellOutput\":{\"capacity\":\"0x1836e2100\",\"lock\":{\"codeHash\":\"0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8\",\"hashType\":\"type\",\"args\":\"0xf1e5e5641a3810fefaccaae4076f91a5de444726\"}},\"outputData\":\"0x\"}],\"outputs\":[{\"capacity\":\"0x189640200\",\"lock\":{\"codeHash\":\"0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8\",\"hashType\":\"type\",\"args\":\"0xf1e5e5641a3810fefaccaae4076f91a5de444726\"}},{\"capacity\":\"0x4ddbc89f0\",\"lock\":{\"codeHash\":\"0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8\",\"hashType\":\"type\",\"args\":\"0xdc3ff72c77f90a034b69b593f6b339ced1d85de8\"}}],\"outputsData\":[\"0x\",\"0x\"],\"witnesses\":[\"0x55000000100000005500000055000000410000004c519ff7913e5c40d05ede5d4d45bb148d6c874b931da3e7e1bac37a746331d826e41a511dfe6dda72479457605b241ab4cdeb664556fe24d8d10c23014336a401\"]}"
   }'
 ```
 响应
 ```
 {
     "paymentId": "1",
-    "txHash": "0x6d6f636b5f74785f686173685f73656e745f31373631383039303938353335",
+    "txHash": "0xbf3a147b95f77bea63bc75d0fa845c7a8189b69e503b6222c379bc8c0785b6fc",
     "status": "completed"
 }
 ```

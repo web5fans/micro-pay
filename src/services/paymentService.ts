@@ -1,9 +1,8 @@
 import { createPayment, createPaymentWithTransaction, getPaymentById, getPaymentsBySender, getUncompletedPaymentsBySender, updatePaymentStatus } from '../models/payment';
 import { createAccount, createAccountWithTransaction } from '../models/account';
 import { getAvailablePlatformAddress, getAvailablePlatformAddressWithTransaction, releasePlatformAddress } from '../models/platformAddress';
-import { build2to2Transaction, getAddressBalance, sendTransaction } from './ckbService';
+import { build2to2Transaction, completeTransaction, getAddressBalance } from './ckbService';
 import { withTransaction } from '../db';
-import { PoolClient } from 'pg';
 
 // 分账接收者接口
 interface SplitReceiver {
@@ -99,17 +98,16 @@ export async function preparePayment(
 }
 
 // 完成转账
-export async function completeTransfer(paymentId: number, signedTx: any) {
+export async function completeTransfer(paymentId: number, partSignedTx: string) {
   try {
     // 检查支付记录是否存在
     const payment = await getPaymentById(paymentId);
     if (!payment || payment.is_complete) {
-      console.error(`Payment with ID ${paymentId} not found or already completed`);
       throw new Error('Payment not found or already completed');
     }
 
-    // 发送交易到链上
-    const txHash = await sendTransaction(signedTx);
+    // 完善交易并发送交易到链上
+    const txHash = await completeTransaction(payment.platform_address_index, partSignedTx);
     
     // 更新支付状态
     await updatePaymentStatus(paymentId, txHash);
