@@ -12,7 +12,7 @@
 
 但是因为接收者也需要参与构造交易，且需要为 input cell 提供签名，所以双方必须同时在线。
 
-ACP（https://github.com/nervosnetwork/rfcs/blob/master/rfcs/0026-anyone-can-pay/0026-anyone-can-pay.md）方案在2-2方案的基础上对lock script 进行了修改，使得接收者的 input cell 无需签名，解决了接收者必须在线的问题。
+(ACP)[https://github.com/nervosnetwork/rfcs/blob/master/rfcs/0026-anyone-can-pay/0026-anyone-can-pay.md] 方案在2-2方案的基础上对lock script 进行了修改，使得接收者的 input cell 无需签名，解决了接收者必须在线的问题。
 
 但是 ACP 因为新增加了 lock script，所以需要生态支持，以及其他一些问题，目前使用并不多。
 
@@ -37,6 +37,8 @@ ACP（https://github.com/nervosnetwork/rfcs/blob/master/rfcs/0026-anyone-can-pay
 因为 2-2 交易中，input cell 需要被锁定，防止被重复使用。
 
 为了应对并发，平台配置一个助记词，通过该助记词派生出多个地址。
+
+助记词及推导出的地址可以使用 https://app.ckbccc.com/utils/Mnemonic 来生成。
 
 例如对于示例配置，平台会派生出 10 个地址。
 
@@ -163,16 +165,16 @@ OK
 curl -X POST http://localhost:3000/api/payment/prepare \
   -H "Content-Type: application/json" \
   -d '{
-    "sender": "ckb_address_sender",
-    "receiver": "ckb_address_receiver",
+    "sender": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqwu8lmjcalepgp5k6d4j0mtxwww68v9m6qz0q8ah",
+    "receiver": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqttz30qvq8rlht9r9wc6lqu27x6ykx5eyskhysra",
     "amount": 100000000,
     "splitReceivers": [
       {
-        "address": "ckb_address_split1",
+        "address": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsq0stn7whuvhjc2gm0frkjrg80wqac7xvlqf5qh7w",
         "splitRate": 10
       },
       {
-        "address": "ckb_address_split2",
+        "address": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsq0stn7whuvhjc2gm0frkjrg80wqac7xvlqf5qh7w",
         "splitRate": 20
       }
     ],
@@ -183,46 +185,8 @@ curl -X POST http://localhost:3000/api/payment/prepare \
 ```
 {
     "paymentId": 1,
-    "rawTx": {
-        "version": "0x0",
-        "cellDeps": [
-            {
-                "outPoint": {
-                    "txHash": "0x71a7ba8fc96349fea0ed3a5c47992e3b4084b031a42264a018e0072e8172e46c",
-                    "index": "0x0"
-                },
-                "depType": "depGroup"
-            }
-        ],
-        "headerDeps": [],
-        "inputs": [
-            {
-                "previousOutput": {
-                    "txHash": "0x29ed7c9b1f0684c3b5789d85e89d8f59c6531bf386d7eb2918eed0d93ceaf7e9",
-                    "index": "0x0"
-                },
-                "since": "0x0"
-            }
-        ],
-        "outputs": [
-            {
-                "capacity": "0x5f5e100",
-                "lock": {
-                    "codeHash": "0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8",
-                    "args": "0x8211f1b938a107cd53b6302cc752a6fc3965638d",
-                    "hashType": "type"
-                },
-                "type": null
-            }
-        ],
-        "outputsData": [
-            "0x"
-        ],
-        "witnesses": [
-            "0x"
-        ]
-    },
-    "txHash": "0x6d6f636b5f74785f686173685f31373631383038393331373239"
+    "rawTx": "{\"version\":\"0x0\",\"cellDeps\":[{\"outPoint\":{\"txHash\":\"0xf8de3bb47d055cdf460d93a2a6e1b05f7432f9777c8c474abf4eec1d4aee5d37\",\"index\":\"0x0\"},\"depType\":\"depGroup\"}],\"headerDeps\":[],\"inputs\":[{\"previousOutput\":{\"txHash\":\"0x38cccf9dfae31269c01574bd02f8afeef742d4b80ff17e905cd883461336d3a8\",\"index\":\"0x0\"},\"since\":\"0x0\"},{\"previousOutput\":{\"txHash\":\"0xcd76398eaada6994c82cc4772d259a970a45e657352580ada0a25547531ac2a1\",\"index\":\"0x0\"},\"since\":\"0x0\"}],\"outputs\":[{\"capacity\":\"0x189640200\",\"lock\":{\"codeHash\":\"0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8\",\"hashType\":\"type\",\"args\":\"0xf1e5e5641a3810fefaccaae4076f91a5de444726\"}},{\"capacity\":\"0x4ddbc89f0\",\"lock\":{\"codeHash\":\"0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8\",\"hashType\":\"type\",\"args\":\"0xdc3ff72c77f90a034b69b593f6b339ced1d85de8\"}}],\"outputsData\":[\"0x\",\"0x\"],\"witnesses\":[]}",
+    "txHash": "0xbf3a147b95f77bea63bc75d0fa845c7a8189b69e503b6222c379bc8c0785b6fc"
 }
 ```
 

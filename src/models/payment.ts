@@ -82,6 +82,15 @@ export async function getPaymentsBySender(sender: string): Promise<Payment[]> {
   return result.rows;
 }
 
+export async function getUncompletedPaymentsBySender(sender: string): Promise<Payment[]> {
+  const result = await query(
+    `SELECT * FROM payment WHERE sender = $1 AND is_complete = false ORDER BY created_at DESC`,
+    [sender]
+  );
+  
+  return result.rows;
+}
+
 export async function getPaymentsByReceiver(receiver: string): Promise<Payment[]> {
   const result = await query(
     `SELECT * FROM payment WHERE receiver = $1 ORDER BY created_at DESC`,
