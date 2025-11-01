@@ -32,10 +32,10 @@ export async function getAllPlatformAddress(): Promise<PlatformAddress[]> {
   return result.rows || [];
 }
 
-// 获取一个可用的平台地址（支持事务）
+// Get an available platform address (transaction supported)
 export async function getAvailablePlatformAddressWithTransaction(client: any) {
   try {
-    // 从数据库获取一个未使用的平台地址
+    // Get an unused platform address from database
     const result = await client.query(
       'UPDATE platform_address SET is_used = true WHERE id = (SELECT id FROM platform_address WHERE is_used = false LIMIT 1) RETURNING index, address',
       []
@@ -51,14 +51,14 @@ export async function getAvailablePlatformAddressWithTransaction(client: any) {
     return null;
   } catch (error) {
     console.error('Error getting available platform address:', error);
-    throw error; // 在事务中抛出错误以触发回滚
+    throw error; // Throw error in transaction to trigger rollback
   }
 }
 
-// 获取一个可用的平台地址（非事务版本，向后兼容）
+// Get an available platform address (non-transaction version, backward compatible)
 export async function getAvailablePlatformAddress() {
   try {
-    // 从数据库获取一个未使用的平台地址
+    // Get an unused platform address from database
     const result = await query(
       'UPDATE platform_address SET is_used = true WHERE id = (SELECT id FROM platform_address WHERE is_used = false LIMIT 1) RETURNING index, address',
       []
@@ -76,7 +76,7 @@ export async function getAvailablePlatformAddress() {
   }
 }
 
-// 释放平台地址
+// Release platform address
 export async function releasePlatformAddress(index: number) {
   try {
     await query('UPDATE platform_address SET is_used = false WHERE index = $1', [index]);

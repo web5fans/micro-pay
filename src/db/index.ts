@@ -1,10 +1,10 @@
 import { Pool, PoolClient } from 'pg';
 import dotenv from 'dotenv';
 
-// 加载环境变量
+// load environment variables
 dotenv.config();
 
-// 数据库连接配置
+// Database connection configuration
 const pool = new Pool({
   user: process.env.DB_USER || 'postgres',
   host: process.env.DB_HOST || 'localhost',
@@ -13,10 +13,10 @@ const pool = new Pool({
   port: parseInt(process.env.DB_PORT || '5432'),
 });
 
-// 查询函数
+// Query function
 export const query = (text: string, params: any[]) => pool.query(text, params);
 
-// 事务支持
+// Transaction support
 export const withTransaction = async <T>(callback: (client: PoolClient) => Promise<T>): Promise<T> => {
   const client = await pool.connect();
   try {
@@ -32,10 +32,10 @@ export const withTransaction = async <T>(callback: (client: PoolClient) => Promi
   }
 };
 
-// 初始化数据库表
+// Initialize database tables
 export async function initDb() {
   try {
-    // 创建支付表
+    // Create payment table
     await query(`
       CREATE TABLE IF NOT EXISTS payment(
         id SERIAL PRIMARY KEY,
@@ -51,7 +51,7 @@ export async function initDb() {
       )
     `, []);
     
-    // 创建账户表
+    // Create account table
     await query(`
       CREATE TABLE IF NOT EXISTS account(
         id SERIAL PRIMARY KEY,
@@ -66,7 +66,7 @@ export async function initDb() {
       )
     `, []);
     
-    // 创建平台地址表
+    // Create platform address table
     await query(`
       CREATE TABLE IF NOT EXISTS platform_address(
         id SERIAL PRIMARY KEY,

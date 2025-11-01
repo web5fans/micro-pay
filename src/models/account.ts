@@ -29,7 +29,7 @@ export async function createAccount(
   return result.rows[0];
 }
 
-// 创建分账记录（事务版本）
+// Create split account record (transaction version)
 export async function createAccountWithTransaction(
   client: PoolClient,
   payment_id: number,

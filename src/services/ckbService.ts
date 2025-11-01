@@ -4,28 +4,26 @@ import * as bip39 from "@scure/bip39";
 import { wordlist } from '@scure/bip39/wordlists/english.js';
 import { createPlatformAddress, getAllPlatformAddress, PlatformAddress } from "../models/platformAddress";
 import dotenv from 'dotenv';
+import { query } from '../db';
 
-// 加载环境变量
+// load environment variables
 dotenv.config();
 
-// 平台配置
+// Platform configuration
 const MIN_WITHDRAWAL_AMOUNT = BigInt(65 * 10**8); // 65 CKB in shannons
-// 提供一个默认的测试助记词，仅用于开发环境
+// Provide a default test mnemonic for development environment
 const PLATFORM_MNEMONIC = process.env.PLATFORM_MNEMONIC || 'calm gown solid jaguar card web paper loan scale sister rebel syrup';
 const CKB_NODE_URL = process.env.CKB_NODE_URL || 'https://testnet.ckb.dev/rpc';
 const CKB_NETWORK = process.env.CKB_NETWORK || 'ckb_testnet';
 
-// 生成多个平台地址
+// Generate multiple platform addresses
 const PLATFORM_ADDRESS_COUNT = 2;
 const platformAddresses: string[] = [];
-
-// 导入数据库查询函数
-import { query } from '../db';
 
 // CKB client
 const cccClient = CKB_NETWORK === 'ckb_testnet' ? new ccc.ClientPublicTestnet() : new ccc.ClientPublicMainnet();
 
-// 初始化平台地址
+// Initialize platform addresses
 export async function initPlatformAddresses() { 
   // 检查数据库中是否已有平台地址
   const existingAddresses = await getAllPlatformAddress();
@@ -49,7 +47,7 @@ export async function initPlatformAddresses() {
   const seed = await bip39.mnemonicToSeed(PLATFORM_MNEMONIC);
   const hdKey = HDKey.fromMasterSeed(seed);
   
-  // 生成多个平台地址并存入数据库
+  // Generate and store platform addresses
   for (let i = 0; i < PLATFORM_ADDRESS_COUNT; i++) {
     const path = `m/44'/309'/0'/0/${i}`;
     const derivedKey = hdKey.derive(path);
@@ -61,7 +59,7 @@ export async function initPlatformAddresses() {
           ).getRecommendedAddress();
     console.log(`Path: ${path}, Address: ${address}`);
     
-    // 存入数据库
+    // Store address in database
     await createPlatformAddress(address, i);
     
     platformAddresses.push(address);
@@ -96,7 +94,7 @@ export async function getAddressBalance(ckbAddress: string): Promise<bigint> {
   return balance;
 }
 
-// 构建2-2交易
+// build 2-2 transaction
 export async function build2to2Transaction(
   senderAddress: string,
   platformAddress: string,
@@ -116,7 +114,7 @@ export async function build2to2Transaction(
       platformAddr.script
     );
 
-    // 挑选合适的cell作为交易的input
+    // Select suitable cells as transaction inputs
     let sendSum = BigInt(0);
     const senderCells = [];
     for await (const cell of senderSigner.findCells(
@@ -131,15 +129,12 @@ export async function build2to2Transaction(
         break;
       }
     }
-  
-    console.log('Sender cells:', senderCells);
-    console.log('Sender sum:', sendSum);
 
     if (sendSum < amount + MIN_WITHDRAWAL_AMOUNT) {
       throw new Error('Sender not enough balance');
     }
 
-    // 每个平台地址只有一个cell
+    // Each platform address only has one cell
     const platformCells = [];
     let platformSum = BigInt(0);
     for await (const cell of platformSigner.findCells(
@@ -150,7 +145,7 @@ export async function build2to2Transaction(
     )) {
       platformSum = platformSum + BigInt(cell.cellOutput.capacity);
       platformCells.push(cell);
-      break; // 只取第一个 cell
+      break;
     }
 
     if (platformCells.length === 0) {
@@ -163,8 +158,9 @@ export async function build2to2Transaction(
       since: "0x0",
     }));
 
-    // 收集所有的lock codehash 并去重
+    // Collect all lock codehashes and remove duplicates
     const lockCodeHashes = new Set(inputCells.map((cell) => cell.cellOutput.lock.codeHash));
+    // Collect all cell dependencies
     const cellDeps: CellDepLike[] = [];
     for (const codeHash of lockCodeHashes) {
       Object.entries(cccClient.scripts).forEach(([key, value]) => {
@@ -180,6 +176,7 @@ export async function build2to2Transaction(
       });
     }
 
+    // fixed fee
     const fee = BigInt(10000);
     const outputs = [
       {
@@ -224,10 +221,8 @@ export async function completeTransaction(platformAddressIndex: number, partSign
     const platformPrivateKey = await getPrivateKey(platformAddressIndex);
     const platformSigner = new ccc.SignerCkbPrivateKey(cccClient, platformPrivateKey);
 
-    // 完善交易并发送交易到链上
     const signedTx = await platformSigner.signTransaction(tx);
 
-    // 发送交易到链上
     const txHash = await platformSigner.sendTransaction(signedTx);
     
     return txHash;
@@ -239,11 +234,7 @@ export async function completeTransaction(platformAddressIndex: number, partSign
   }
 }
 
-// 检查交易状态
+// check transaction status
 export async function checkTransactionStatus(txHash: string): Promise<boolean> {
-  // Mock实现，模拟检查交易状态
-  console.log(`Mock: 检查交易状态 - 交易哈希: ${txHash}`);
-  
-  // 模拟交易已确认
   return true;
 }

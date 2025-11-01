@@ -5,35 +5,35 @@ import dotenv from 'dotenv';
 import { initPlatformAddresses } from './services/ckbService';
 import { startPaymentCleanupTask } from './services/paymentCleanupService';
 
-// 加载环境变量
+// Load environment variables
 dotenv.config();
 
-// 创建Express应用
+// Create Express application
 const app = express();
 const port = process.env.PORT || 3000;
 
-// 中间件
+// Middleware
 app.use(express.json());
 
-// 健康检查接口
+// Health check endpoint
 app.get('/health', (req, res) => {
   res.send('OK');
 });
 
-// 路由
+// Routes
 app.use('/api/payment', paymentRouter);
 
-// 启动服务器
+// Start server
 async function startServer() {
   try {
-    // 初始化数据库
+    // Initialize database
     await initDb();
     
-    // 初始化平台地址
+    // Initialize platform addresses
     await initPlatformAddresses();
     
-    // 启动定期检查未完成支付记录的任务
-    // 每1分钟检查一次，超过5分钟未完成的支付记录将被视为超时
+    // Start periodic check for incomplete payment records
+    // Check every 1 minute, payments incomplete for more than 5 minutes will be considered timeout
     startPaymentCleanupTask(1, 5);
     
     app.listen(port, () => {

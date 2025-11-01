@@ -3,70 +3,70 @@ import { deleteAccountsByPaymentId } from '../models/account';
 import { releasePlatformAddress } from '../models/platformAddress';
 
 /**
- * 清理超时的支付记录
- * @param timeoutMinutes 超时时间（分钟）
+ * Clean up timeout payment records
+ * @param timeoutMinutes Timeout duration (minutes)
  */
 export async function cleanupTimeoutPayments(timeoutMinutes: number = 5): Promise<void> {
   try {
-    console.log(`[Payment Cleanup] 开始检查超时支付记录 (${timeoutMinutes}分钟)...`);
+    console.log(`[Payment Cleanup] Starting to check timeout payment records (${timeoutMinutes} minutes)...`);
     
-    // 获取所有超时的未完成支付记录
+    // Get all timeout incomplete payment records
     const timeoutPayments = await getTimeoutPayments(timeoutMinutes);
     
     if (timeoutPayments.length === 0) {
-      console.log('[Payment Cleanup] 没有发现超时支付记录');
+      console.log('[Payment Cleanup] No timeout payment records found');
       return;
     }
     
-    console.log(`[Payment Cleanup] 发现 ${timeoutPayments.length} 条超时支付记录`);
+    console.log(`[Payment Cleanup] Found ${timeoutPayments.length} timeout payment records`);
     
-    // 处理每一条超时支付记录
+    // Process each timeout payment record
     for (const payment of timeoutPayments) {
       try {
-        console.log(`[Payment Cleanup] 处理支付记录 ID: ${payment.id}, 发送者: ${payment.sender}`);
+        console.log(`[Payment Cleanup] Processing payment record ID: ${payment.id}, Sender: ${payment.sender}`);
         
-        // 1. 删除相关的分账记录
+        // 1. Delete related account records
         await deleteAccountsByPaymentId(payment.id);
-        console.log(`[Payment Cleanup] 已删除支付记录 ${payment.id} 的相关分账记录`);
+        console.log(`[Payment Cleanup] Deleted account records for payment ${payment.id}`);
         
-        // 2. 释放平台地址
+        // 2. Release platform address
         await releasePlatformAddress(payment.platform_address_index);
-        console.log(`[Payment Cleanup] 已释放平台地址索引: ${payment.platform_address_index}`);
+        console.log(`[Payment Cleanup] Released platform address index: ${payment.platform_address_index}`);
         
-        // 3. 删除支付记录
+        // 3. Delete payment record
         await deletePayment(payment.id);
-        console.log(`[Payment Cleanup] 已删除支付记录 ID: ${payment.id}`);
+        console.log(`[Payment Cleanup] Deleted payment record ID: ${payment.id}`);
       } catch (error) {
-        console.error(`[Payment Cleanup] 处理支付记录 ${payment.id} 时出错:`, error);
+        console.error(`[Payment Cleanup] Error processing payment record ${payment.id}:`, error);
       }
     }
     
-    console.log('[Payment Cleanup] 超时支付记录清理完成');
+    console.log('[Payment Cleanup] Timeout payment records cleanup completed');
   } catch (error) {
-    console.error('[Payment Cleanup] 清理超时支付记录时出错:', error);
+    console.error('[Payment Cleanup] Error cleaning up timeout payment records:', error);
   }
 }
 
 /**
- * 启动定期清理任务
- * @param intervalMinutes 清理间隔（分钟）
- * @param timeoutMinutes 支付超时时间（分钟）
+ * Start periodic cleanup task
+ * @param intervalMinutes Cleanup interval (minutes)
+ * @param timeoutMinutes Payment timeout duration (minutes)
  */
 export function startPaymentCleanupTask(intervalMinutes: number = 1, timeoutMinutes: number = 5): NodeJS.Timeout {
-  console.log(`[Payment Cleanup] 启动定期清理任务，间隔: ${intervalMinutes}分钟，超时时间: ${timeoutMinutes}分钟`);
+  console.log(`[Payment Cleanup] Starting periodic cleanup task, interval: ${intervalMinutes} minutes, timeout: ${timeoutMinutes} minutes`);
   
-  // 立即执行一次清理
+  // Execute cleanup immediately
   cleanupTimeoutPayments(timeoutMinutes).catch(err => {
-    console.error('[Payment Cleanup] 初始清理任务执行失败:', err);
+    console.error('[Payment Cleanup] Initial cleanup task execution failed:', err);
   });
   
-  // 设置定期执行的间隔
+  // Set periodic execution interval
   const intervalMs = intervalMinutes * 60 * 1000;
   
-  // 返回定时器，以便在需要时可以停止任务
+  // Return timer for potential task cancellation
   return setInterval(() => {
     cleanupTimeoutPayments(timeoutMinutes).catch(err => {
-      console.error('[Payment Cleanup] 定期清理任务执行失败:', err);
+      console.error('[Payment Cleanup] Periodic cleanup task execution failed:', err);
     });
   }, intervalMs);
 }

@@ -32,7 +32,7 @@ export async function createPayment(
   return result.rows[0];
 }
 
-// 创建支付记录（事务版本）
+// Create payment record (transaction version)
 export async function createPaymentWithTransaction(
   client: PoolClient,
   sender: string,
