@@ -316,4 +316,4 @@ curl -X GET http://localhost:3000/api/payment/receiver/ckt1qzda0cr08m85hc8jlnfp3
 ## TODO
 - [ ] 事务保障需要完善
 - [ ] transfer要等tx确认
-- [ ] 平台账户数量要可变更
+- [X] 平台账户数量要可变更

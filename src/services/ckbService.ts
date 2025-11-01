@@ -17,7 +17,7 @@ const CKB_NODE_URL = process.env.CKB_NODE_URL || 'https://testnet.ckb.dev/rpc';
 const CKB_NETWORK = process.env.CKB_NETWORK || 'ckb_testnet';
 
 // Generate multiple platform addresses
-const PLATFORM_ADDRESS_COUNT = 2;
+const PLATFORM_ADDRESS_COUNT = Number(process.env.PLATFORM_ADDRESS_COUNT || 2);
 const platformAddresses: string[] = [];
 
 // CKB client
@@ -25,16 +25,17 @@ const cccClient = CKB_NETWORK === 'ckb_testnet' ? new ccc.ClientPublicTestnet() 
 
 // Initialize platform addresses
 export async function initPlatformAddresses() { 
-  // 检查数据库中是否已有平台地址
+  // get all platform addresses from database
   const existingAddresses = await getAllPlatformAddress();
-  if (existingAddresses.length > 0) {
-    console.log(`Found ${existingAddresses.length} platform addresses in database`);
-    
-    // 加载地址到内存
-    const dbAddresses = await query('SELECT address, index FROM platform_address', []);
-    for (const row of dbAddresses.rows) {
-      platformAddresses.push(row.address);
-    }
+  
+  console.log(`Found ${existingAddresses.length} platform addresses in database`);
+  
+  // add existing addresses to platformAddresses
+  for (const addr of existingAddresses) {
+    platformAddresses.push(addr.address);
+  }
+
+  if (existingAddresses.length >= PLATFORM_ADDRESS_COUNT) {
     return;
   }
 
@@ -48,11 +49,10 @@ export async function initPlatformAddresses() {
   const hdKey = HDKey.fromMasterSeed(seed);
   
   // Generate and store platform addresses
-  for (let i = 0; i < PLATFORM_ADDRESS_COUNT; i++) {
+  for (let i = existingAddresses.length; i < PLATFORM_ADDRESS_COUNT; i++) {
     const path = `m/44'/309'/0'/0/${i}`;
     const derivedKey = hdKey.derive(path);
     const publicKey = derivedKey.publicKey!;
-    const privateKey = derivedKey.privateKey!;
     const address = await new ccc.SignerCkbPublicKey(
             cccClient,
             publicKey,
