@@ -1,7 +1,7 @@
 import { createPayment, createPaymentWithTransaction, getPaymentById, getPaymentsBySender, getUncompletedPaymentsBySender, updatePaymentStatus } from '../models/payment';
 import { createAccount, createAccountWithTransaction } from '../models/account';
 import { getAvailablePlatformAddress, getAvailablePlatformAddressWithTransaction, releasePlatformAddress } from '../models/platformAddress';
-import { build2to2Transaction, completeTransaction, getAddressBalance } from './ckbService';
+import { build2to2Transaction, completeTransaction, getAddressBalance, MIN_WITHDRAWAL_AMOUNT } from './ckbService';
 import { withTransaction } from '../db';
 
 // Split receiver interface
@@ -26,11 +26,9 @@ export async function preparePayment(
 
   // Check if sender address has enough balance
   const senderBalance = await getAddressBalance(senderAddress);
-  if (senderBalance < BigInt(amount)) {
+  if (senderBalance < BigInt(amount) + MIN_WITHDRAWAL_AMOUNT) {
     throw new Error('Sender does not have enough balance');
   }
-
-  console.log('amount:', amount);
 
   // Get available platform address
   const platformAddressRecord = await getAvailablePlatformAddress();
@@ -111,6 +109,9 @@ export async function completeTransfer(paymentId: number, partSignedTx: string) 
     
     // Update payment status to completed
     await updatePaymentStatus(paymentId, txHash);
+
+    // Release platform address
+    await releasePlatformAddress(payment.platform_address_index);
     
     return {
       paymentId,
