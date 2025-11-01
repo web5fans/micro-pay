@@ -3,6 +3,7 @@ import { paymentRouter } from './api/payment';
 import { initDb } from './db';
 import dotenv from 'dotenv';
 import { initPlatformAddresses } from './services/ckbService';
+import { startPaymentCleanupTask } from './services/paymentCleanupService';
 
 // 加载环境变量
 dotenv.config();
@@ -30,6 +31,10 @@ async function startServer() {
     
     // 初始化平台地址
     await initPlatformAddresses();
+    
+    // 启动定期检查未完成支付记录的任务
+    // 每1分钟检查一次，超过5分钟未完成的支付记录将被视为超时
+    startPaymentCleanupTask(1, 5);
     
     app.listen(port, () => {
       console.log(`Server is running at http://localhost:${port}`);

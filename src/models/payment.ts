@@ -100,6 +100,25 @@ export async function getPaymentsByReceiver(receiver: string): Promise<Payment[]
   return result.rows;
 }
 
+export async function getTimeoutPayments(timeoutMinutes: number = 5): Promise<Payment[]> {
+  const result = await query(
+    `SELECT * FROM payment 
+     WHERE is_complete = false 
+     AND created_at < NOW() - INTERVAL '${timeoutMinutes} minutes'
+     ORDER BY created_at ASC`,
+    []
+  );
+  
+  return result.rows;
+}
+
+export async function deletePayment(id: number): Promise<void> {
+  await query(
+    `DELETE FROM payment WHERE id = $1`,
+    [id]
+  );
+}
+
 export async function getAllPayments(): Promise<Payment[]> {
   const result = await query(
     `SELECT * FROM payment ORDER BY created_at DESC`,

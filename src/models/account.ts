@@ -59,6 +59,13 @@ export async function updateAccountStatus(id: number, tx_hash: string): Promise<
   return result.rows[0];
 }
 
+export async function deleteAccountsByPaymentId(payment_id: number): Promise<void> {
+  await query(
+    `DELETE FROM account WHERE payment_id = $1`,
+    [payment_id]
+  );
+}
+
 export async function getAccountsByPaymentId(payment_id: number): Promise<Account[]> {
   const result = await query(
     `SELECT * FROM account WHERE payment_id = $1`,
