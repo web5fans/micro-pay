@@ -7,18 +7,18 @@ export interface PlatformAddress {
   index: number;
   is_used: boolean;
   created_at: Date;
+  updated_at: Date;
 }
 
 export async function createPlatformAddress(
   address: string,
   index: number
 ): Promise<PlatformAddress> {
-  const timeNow = new Date().toISOString();
   const result = await query(
-    `INSERT INTO platform_address (address, index, is_used, created_at)
-     VALUES ($1, $2, $3, $4)
+    `INSERT INTO platform_address (address, index)
+     VALUES ($1, $2)
      RETURNING *`,
-    [address, index, false, timeNow]
+    [address, index]
   );
   
   return result.rows[0];
@@ -33,11 +33,11 @@ export async function getAllPlatformAddress(): Promise<PlatformAddress[]> {
 }
 
 // Get an available platform address (transaction supported)
-export async function getAvailablePlatformAddressWithTransaction(client: any) {
+export async function getAvailablePlatformAddressWithTransaction(client: PoolClient) {
   try {
     // Get an unused platform address from database
     const result = await client.query(
-      'UPDATE platform_address SET is_used = true WHERE id = (SELECT id FROM platform_address WHERE is_used = false LIMIT 1) RETURNING index, address',
+      'UPDATE platform_address SET is_used = true, updated_at = NOW() WHERE id = (SELECT id FROM platform_address WHERE is_used = false LIMIT 1) RETURNING index, address',
       []
     );
 
@@ -60,7 +60,7 @@ export async function getAvailablePlatformAddress() {
   try {
     // Get an unused platform address from database
     const result = await query(
-      'UPDATE platform_address SET is_used = true WHERE id = (SELECT id FROM platform_address WHERE is_used = false LIMIT 1) RETURNING index, address',
+      'UPDATE platform_address SET is_used = true, updated_at = NOW() WHERE id = (SELECT id FROM platform_address WHERE is_used = false LIMIT 1) RETURNING index, address',
       []
     );
     
@@ -79,9 +79,23 @@ export async function getAvailablePlatformAddress() {
 // Release platform address
 export async function releasePlatformAddress(index: number) {
   try {
-    await query('UPDATE platform_address SET is_used = false WHERE index = $1', [index]);
+    await query('UPDATE platform_address SET is_used = false, updated_at = NOW() WHERE index = $1', [index]);
     console.log(`Released platform address: ${index}`);  
   } catch (error) {
     console.error('Error releasing platform address:', error);
+  }
+}
+
+// Release platform address with transaction
+export async function releasePlatformAddressWithTransaction(
+  client: PoolClient,
+  index: number
+) {
+  try {
+    await client.query('UPDATE platform_address SET is_used = false, updated_at = NOW() WHERE index = $1', [index]);
+    console.log(`Released platform address: ${index}`);  
+  } catch (error) {
+    console.error('Error releasing platform address:', error);
+    throw error; // Throw error in transaction to trigger rollback
   }
 }

@@ -7,26 +7,10 @@ export interface Account {
   receiver: string;
   amount: number;
   info: string | null;
-  is_payed: boolean;
+  status: number; // 0: prepare, 1: (payment) complete, 2: cancel, 3: accounting, 4: accounted
   tx_hash: string | null;
   created_at: Date;
   updated_at: Date;
-}
-
-export async function createAccount(
-  payment_id: number,
-  receiver: string,
-  amount: number,
-  info: string | null = null
-): Promise<Account> {
-  const result = await query(
-    `INSERT INTO account (payment_id, receiver, amount, info)
-     VALUES ($1, $2, $3, $4) 
-     RETURNING *`,
-    [payment_id, receiver, amount, info]
-  );
-  
-  return result.rows[0];
 }
 
 // Create split account record (transaction version)
@@ -38,8 +22,8 @@ export async function createAccountWithTransaction(
   info: string | null = null
 ) {
   const result = await client.query(
-    `INSERT INTO account (payment_id, receiver, amount, info)
-     VALUES ($1, $2, $3, $4) 
+    `INSERT INTO account (payment_id, receiver, amount, info, status)
+     VALUES ($1, $2, $3, $4, 0)
      RETURNING *`,
     [payment_id, receiver, amount, info]
   );
@@ -47,21 +31,27 @@ export async function createAccountWithTransaction(
   return result.rows[0];
 }
 
-export async function updateAccountStatus(id: number, tx_hash: string): Promise<Account> {
-  const result = await query(
+// Update account status to complete (transaction version)
+export async function updateAccountStatusFromPrepareToCompleteWithTransaction(
+  client: PoolClient,
+  payment_id: number
+) {
+  await client.query(
     `UPDATE account
-     SET is_payed = true, tx_hash = $2, updated_at = NOW()
-     WHERE id = $1
-     RETURNING *`,
-    [id, tx_hash]
+     SET status = 1, updated_at = NOW()
+     WHERE payment_id = $1 And status = 0`,
+    [payment_id]
   );
-  
-  return result.rows[0];
 }
 
-export async function deleteAccountsByPaymentId(payment_id: number): Promise<void> {
-  await query(
-    `DELETE FROM account WHERE payment_id = $1`,
+export async function updateAccountStatusFromPrepareToCancelWithTransaction(
+  client: PoolClient,
+  payment_id: number
+) {
+  await client.query(
+    `UPDATE account 
+     SET status = 2, updated_at = NOW()
+     WHERE payment_id = $1 And status = 0`,
     [payment_id]
   );
 }
@@ -70,15 +60,6 @@ export async function getAccountsByPaymentId(payment_id: number): Promise<Accoun
   const result = await query(
     `SELECT * FROM account WHERE payment_id = $1`,
     [payment_id]
-  );
-  
-  return result.rows;
-}
-
-export async function getUnpaidAccounts(): Promise<Account[]> {
-  const result = await query(
-    `SELECT * FROM account WHERE is_payed = false`,
-    []
   );
   
   return result.rows;

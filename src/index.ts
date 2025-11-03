@@ -4,6 +4,7 @@ import { initDb } from './db';
 import dotenv from 'dotenv';
 import { initPlatformAddresses } from './services/ckbService';
 import { startPaymentCleanupTask } from './services/paymentCleanupService';
+import { startPaymentCheckTask } from './services/paymentCheckService';
 
 // Load environment variables
 dotenv.config();
@@ -33,8 +34,12 @@ async function startServer() {
     await initPlatformAddresses();
     
     // Start periodic check for incomplete payment records
-    // Check every 1 minute, payments incomplete for more than 5 minutes will be considered timeout
-    startPaymentCleanupTask(1, 5);
+    // Check every 30 seconds, payments incomplete for more than 60 seconds will be considered timeout
+    startPaymentCleanupTask(30, 60);
+
+    // Start periodic check ckb transaction status
+    // Check every 20 seconds, payments with status 'transfer' will be checked
+    startPaymentCheckTask(20);
     
     app.listen(port, () => {
       console.log(`Server is running at http://localhost:${port}`);

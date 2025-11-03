@@ -44,7 +44,7 @@ export async function initDb() {
         platform_address_index INTEGER NOT NULL,
         amount BIGINT NOT NULL,
         info TEXT,
-        is_complete BOOLEAN NOT NULL DEFAULT false,
+        status INTEGER NOT NULL DEFAULT 0,
         tx_hash TEXT,
         created_at TIMESTAMP NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMP NOT NULL DEFAULT NOW()
@@ -59,7 +59,7 @@ export async function initDb() {
         receiver TEXT NOT NULL,
         amount BIGINT NOT NULL,
         info TEXT,
-        is_payed BOOLEAN NOT NULL DEFAULT false,
+        status INTEGER NOT NULL DEFAULT 0,
         tx_hash TEXT,
         created_at TIMESTAMP NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMP NOT NULL DEFAULT NOW()
@@ -73,7 +73,8 @@ export async function initDb() {
         address TEXT NOT NULL UNIQUE,
         index INTEGER,
         is_used BOOLEAN NOT NULL DEFAULT false,
-        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMP NOT NULL DEFAULT NOW()
       )
     `, []);
     

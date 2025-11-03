@@ -1,71 +1,68 @@
-import { getTimeoutPayments, deletePayment } from '../models/payment';
-import { deleteAccountsByPaymentId } from '../models/account';
-import { releasePlatformAddress } from '../models/platformAddress';
+import { getTimeoutPayments, updatePaymentFromPrepareToCancelWithTransaction } from '../models/payment';
+import { updateAccountStatusFromPrepareToCancelWithTransaction } from '../models/account';
+import { releasePlatformAddressWithTransaction } from '../models/platformAddress';
+import { withTransaction } from '../db';
 
 /**
  * Clean up timeout payment records
- * @param timeoutMinutes Timeout duration (minutes)
+ * @param timeoutSeconds Timeout duration (seconds)
  */
-export async function cleanupTimeoutPayments(timeoutMinutes: number = 5): Promise<void> {
+export async function cleanupTimeoutPayments(timeoutSeconds: number = 60): Promise<void> {
   try {
-    console.log(`[Payment Cleanup] Starting to check timeout payment records (${timeoutMinutes} minutes)...`);
+    console.log(`[Payment Cleanup] Starting to check timeout payment records (${timeoutSeconds} seconds)...`);
     
     // Get all timeout incomplete payment records
-    const timeoutPayments = await getTimeoutPayments(timeoutMinutes);
+    const timeoutPayments = await getTimeoutPayments(timeoutSeconds);
     
     if (timeoutPayments.length === 0) {
-      console.log('[Payment Cleanup] No timeout payment records found');
+      console.log(`[Payment Cleanup] No timeout payment records found (${timeoutSeconds} seconds)`);
       return;
     }
     
-    console.log(`[Payment Cleanup] Found ${timeoutPayments.length} timeout payment records`);
+    console.log(`[Payment Cleanup] Found ${timeoutPayments.length} timeout payment records (${timeoutSeconds} seconds)`);
     
     // Process each timeout payment record
     for (const payment of timeoutPayments) {
       try {
-        console.log(`[Payment Cleanup] Processing payment record ID: ${payment.id}, Sender: ${payment.sender}`);
-        
-        // 1. Delete related account records
-        await deleteAccountsByPaymentId(payment.id);
-        console.log(`[Payment Cleanup] Deleted account records for payment ${payment.id}`);
-        
-        // 2. Release platform address
-        await releasePlatformAddress(payment.platform_address_index);
-        console.log(`[Payment Cleanup] Released platform address index: ${payment.platform_address_index}`);
-        
-        // 3. Delete payment record
-        await deletePayment(payment.id);
-        console.log(`[Payment Cleanup] Deleted payment record ID: ${payment.id}`);
+        console.log(`[Payment Cleanup] Processing payment record ID: ${payment.id}, Sender: ${payment.sender}, Timeout: ${timeoutSeconds} seconds`);
+
+        await withTransaction(async (client) => {
+          // 1. Update payment status to cancel
+          await updatePaymentFromPrepareToCancelWithTransaction(client, payment.id);
+          // 2. Release platform address
+          await releasePlatformAddressWithTransaction(client, payment.platform_address_index);
+          // 3. update account status to cancel
+          await updateAccountStatusFromPrepareToCancelWithTransaction(client, payment.id);
+        });
       } catch (error) {
-        console.error(`[Payment Cleanup] Error processing payment record ${payment.id}:`, error);
+        console.error(`[Payment Cleanup] Error processing payment record ${payment.id} (${timeoutSeconds} seconds):`, error);
       }
     }
-    
-    console.log('[Payment Cleanup] Timeout payment records cleanup completed');
+    console.log(`[Payment Cleanup] Timeout payment records cleanup completed (${timeoutSeconds} seconds)`);
   } catch (error) {
-    console.error('[Payment Cleanup] Error cleaning up timeout payment records:', error);
+    console.error(`[Payment Cleanup] Error cleaning up timeout payment records (${timeoutSeconds} seconds):`, error);
   }
 }
 
 /**
  * Start periodic cleanup task
- * @param intervalMinutes Cleanup interval (minutes)
- * @param timeoutMinutes Payment timeout duration (minutes)
+ * @param intervalSeconds Cleanup interval (seconds)
+ * @param timeoutSeconds Payment timeout duration (seconds)
  */
-export function startPaymentCleanupTask(intervalMinutes: number = 1, timeoutMinutes: number = 5): NodeJS.Timeout {
-  console.log(`[Payment Cleanup] Starting periodic cleanup task, interval: ${intervalMinutes} minutes, timeout: ${timeoutMinutes} minutes`);
+export function startPaymentCleanupTask(intervalSeconds: number = 30, timeoutSeconds: number = 60): NodeJS.Timeout {
+  console.log(`[Payment Cleanup] Starting periodic cleanup task, interval: ${intervalSeconds} seconds, timeout: ${timeoutSeconds} seconds`);
   
   // Execute cleanup immediately
-  cleanupTimeoutPayments(timeoutMinutes).catch(err => {
+  cleanupTimeoutPayments(timeoutSeconds).catch(err => {
     console.error('[Payment Cleanup] Initial cleanup task execution failed:', err);
   });
   
   // Set periodic execution interval
-  const intervalMs = intervalMinutes * 60 * 1000;
+  const intervalMs = intervalSeconds * 1000;
   
   // Return timer for potential task cancellation
   return setInterval(() => {
-    cleanupTimeoutPayments(timeoutMinutes).catch(err => {
+    cleanupTimeoutPayments(timeoutSeconds).catch(err => {
       console.error('[Payment Cleanup] Periodic cleanup task execution failed:', err);
     });
   }, intervalMs);

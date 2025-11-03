@@ -8,28 +8,10 @@ export interface Payment {
   platform_address_index: number;
   amount: number;
   info: string | null;
-  is_complete: boolean;
+  status: number; // 0: prepare, 1: transfer, 2: complete, 3: cancel
   tx_hash: string | null;
   created_at: Date;
   updated_at: Date;
-}
-
-export async function createPayment(
-  sender: string,
-  receiver: string,
-  platform_address_index: number,
-  amount: number,
-  info: string | null = null, 
-  txHash: string | null = null
-): Promise<Payment> {
-  const result = await query(
-    `INSERT INTO payment (sender, receiver, platform_address_index, amount, info, is_complete, tx_hash)
-     VALUES ($1, $2, $3, $4, $5, false, $6)
-     RETURNING *`,
-    [sender, receiver, platform_address_index, amount, info, txHash]
-  );
-  
-  return result.rows[0];
 }
 
 // Create payment record (transaction version)
@@ -39,26 +21,68 @@ export async function createPaymentWithTransaction(
   receiver: string,
   platform_address_index: number,
   amount: number,
-  info: string | null = null
+  info: string | null = null,
+  tx_hash: string | null = null
 ) {
   const result = await client.query(
-    `INSERT INTO payment (sender, receiver, platform_address_index, amount, info, is_complete, tx_hash)
-     VALUES ($1, $2, $3, $4, $5, false, $6)
+    `INSERT INTO payment (sender, receiver, platform_address_index, amount, info, status, tx_hash)
+     VALUES ($1, $2, $3, $4, $5, 0, $6)
      RETURNING *`,
-    [sender, receiver, platform_address_index, amount, info, null]
+    [sender, receiver, platform_address_index, amount, info, tx_hash]
   );
   
   return result.rows[0];
 }
 
-
-export async function updatePaymentStatus(id: number, tx_hash: string): Promise<Payment> {
+export async function updatePaymentStatusFromPrepareToTransfer(id: number): Promise<Payment> {
   const result = await query(
     `UPDATE payment
-     SET is_complete = true, tx_hash = $2, updated_at = NOW()
-     WHERE id = $1
+     SET status = 1, updated_at = NOW()
+     WHERE id = $1 AND status = 0
      RETURNING *`,
-    [id, tx_hash]
+    [id] 
+  );
+  
+  return result.rows[0];  
+}
+
+export async function updatePaymentStatusFromTransferToPrepare(id: number): Promise<Payment> {
+  const result = await query(
+    `UPDATE payment
+     SET status = 0, updated_at = NOW()
+     WHERE id = $1 AND status = 1
+     RETURNING *`,
+    [id] 
+  );
+  
+  return result.rows[0];  
+}
+
+export async function updatePaymentStatusFromTransferToCompleteWithTransaction(
+  client: PoolClient,
+  id: number
+): Promise<Payment> {
+  const result = await client.query(
+    `UPDATE payment
+     SET status = 2, updated_at = NOW()
+     WHERE id = $1 AND status = 1
+     RETURNING *`,
+    [id] 
+  );
+  
+  return result.rows[0];  
+}
+
+export async function updatePaymentFromPrepareToCancelWithTransaction(
+  client: PoolClient,
+  id: number
+): Promise<Payment> {
+  const result = await client.query(
+    `UPDATE payment
+     SET status = 3, updated_at = NOW()
+     WHERE id = $1 AND status = 0
+     RETURNING *`,
+    [id] 
   );
   
   return result.rows[0];
@@ -84,27 +108,18 @@ export async function getPaymentsBySender(sender: string): Promise<Payment[]> {
 
 export async function getUncompletedPaymentsBySender(sender: string): Promise<Payment[]> {
   const result = await query(
-    `SELECT * FROM payment WHERE sender = $1 AND is_complete = false ORDER BY created_at DESC`,
+    `SELECT * FROM payment WHERE sender = $1 AND (status = 0 OR status = 1) ORDER BY created_at DESC`,
     [sender]
   );
   
   return result.rows;
 }
 
-export async function getPaymentsByReceiver(receiver: string): Promise<Payment[]> {
-  const result = await query(
-    `SELECT * FROM payment WHERE receiver = $1 ORDER BY created_at DESC`,
-    [receiver]
-  );
-  
-  return result.rows;
-}
-
-export async function getTimeoutPayments(timeoutMinutes: number = 5): Promise<Payment[]> {
+export async function getTimeoutPayments(timeoutSeconds: number = 60): Promise<Payment[]> {
   const result = await query(
     `SELECT * FROM payment 
-     WHERE is_complete = false 
-     AND created_at < NOW() - INTERVAL '${timeoutMinutes} minutes'
+     WHERE status = 0
+     AND created_at < NOW() - INTERVAL '${timeoutSeconds} seconds'
      ORDER BY created_at ASC`,
     []
   );
@@ -112,16 +127,9 @@ export async function getTimeoutPayments(timeoutMinutes: number = 5): Promise<Pa
   return result.rows;
 }
 
-export async function deletePayment(id: number): Promise<void> {
-  await query(
-    `DELETE FROM payment WHERE id = $1`,
-    [id]
-  );
-}
-
-export async function getAllPayments(): Promise<Payment[]> {
+export async function getTransferPayments(): Promise<Payment[]> {
   const result = await query(
-    `SELECT * FROM payment ORDER BY created_at DESC`,
+    `SELECT * FROM payment WHERE status = 1 ORDER BY created_at DESC`,
     []
   );
   

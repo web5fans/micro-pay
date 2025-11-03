@@ -1,10 +1,9 @@
-import { Address, ccc, CellDepLike, hexFrom, Transaction, WitnessArgs } from "@ckb-ccc/core";
+import { Address, ccc, CellDepLike, hexFrom, Transaction } from "@ckb-ccc/core";
 import { HDKey } from "@scure/bip32";
 import * as bip39 from "@scure/bip39";
 import { wordlist } from '@scure/bip39/wordlists/english.js';
-import { createPlatformAddress, getAllPlatformAddress, PlatformAddress } from "../models/platformAddress";
+import { createPlatformAddress, getAllPlatformAddress } from "../models/platformAddress";
 import dotenv from 'dotenv';
-import { query } from '../db';
 
 // load environment variables
 dotenv.config();
@@ -212,11 +211,16 @@ export async function build2to2Transaction(
   }
 }
 
-export async function completeTransaction(platformAddressIndex: number, partSignedTx: string) {
+export async function completeTransaction(platformAddressIndex: number, partSignedTx: string, prepareTxHash: string) {
   try {
     const txObj = JSON.parse(partSignedTx);
 
     const tx = Transaction.from(txObj);
+
+    // Check transaction hash
+    if (tx.hash() !== prepareTxHash) {
+      throw new Error('Transaction hash mismatch');
+    }
 
     const platformPrivateKey = await getPrivateKey(platformAddressIndex);
     const platformSigner = new ccc.SignerCkbPrivateKey(cccClient, platformPrivateKey);
@@ -236,5 +240,11 @@ export async function completeTransaction(platformAddressIndex: number, partSign
 
 // check transaction status
 export async function checkTransactionStatus(txHash: string): Promise<boolean> {
-  return true;
+  try {
+    const txStatus = await cccClient.getTransaction(txHash);
+    return txStatus?.status === 'committed';
+  } catch (error) {
+    console.error('Error checking transaction status:', error);
+    throw error;
+  }
 }

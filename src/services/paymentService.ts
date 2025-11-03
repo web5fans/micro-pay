@@ -1,6 +1,6 @@
-import { createPayment, createPaymentWithTransaction, getPaymentById, getPaymentsBySender, getUncompletedPaymentsBySender, updatePaymentStatus } from '../models/payment';
-import { createAccount, createAccountWithTransaction } from '../models/account';
-import { getAvailablePlatformAddress, getAvailablePlatformAddressWithTransaction, releasePlatformAddress } from '../models/platformAddress';
+import { createPaymentWithTransaction, getUncompletedPaymentsBySender, updatePaymentStatusFromPrepareToTransfer, updatePaymentStatusFromTransferToPrepare } from '../models/payment';
+import { createAccountWithTransaction } from '../models/account';
+import { getAvailablePlatformAddress, releasePlatformAddress } from '../models/platformAddress';
 import { build2to2Transaction, completeTransaction, getAddressBalance, MIN_WITHDRAWAL_AMOUNT } from './ckbService';
 import { withTransaction } from '../db';
 
@@ -18,16 +18,16 @@ export async function preparePayment(
   splitReceivers: SplitReceiver[] = [],
   info: string | null = null
 ) {
-  // If sender has incomplete payments, return error
-  const existingPayment = await getUncompletedPaymentsBySender(senderAddress);
-  if (existingPayment.length > 0) {
-    throw new Error('Sender has an incomplete payment');
-  }
-
   // Check if sender address has enough balance
   const senderBalance = await getAddressBalance(senderAddress);
   if (senderBalance < BigInt(amount) + MIN_WITHDRAWAL_AMOUNT) {
     throw new Error('Sender does not have enough balance');
+  }
+
+  // If sender has incomplete payments, return error
+  const existingPayment = await getUncompletedPaymentsBySender(senderAddress);
+  if (existingPayment.length > 0) {
+    throw new Error('Sender has an incomplete payment');
   }
 
   // Get available platform address
@@ -59,7 +59,8 @@ export async function preparePayment(
         receiverAddress,
         platformAddressRecord.index,
         amount,
-        info
+        info,
+        txHash
       );
 
       // Create split receiver account records
@@ -97,31 +98,26 @@ export async function preparePayment(
 
 // Complete transfer
 export async function completeTransfer(paymentId: number, partSignedTx: string) {
+  // Update payment status to transfer
+  const payment = await updatePaymentStatusFromPrepareToTransfer(paymentId);
+  if (!payment) {
+    throw new Error('Payment not found');
+  }
+
+  let txHash = "";
   try {
-    // Check if payment record exists
-    const payment = await getPaymentById(paymentId);
-    if (!payment || payment.is_complete) {
-      throw new Error('Payment not found or already completed');
-    }
-
     // Complete transaction and send to chain
-    const txHash = await completeTransaction(payment.platform_address_index, partSignedTx);
-    
-    // Update payment status to completed
-    await updatePaymentStatus(paymentId, txHash);
-
-    // Release platform address
-    await releasePlatformAddress(payment.platform_address_index);
-    
-    return {
-      paymentId,
-      txHash,
-      status: 'completed'
-    };
+    txHash = await completeTransaction(payment.platform_address_index, partSignedTx, payment.tx_hash!);
   } catch (error) {
-    if (error instanceof Error) {
-      console.error('Error completing transfer:', error.message);
-    }
+    // Rollback payment status to prepare
+    await updatePaymentStatusFromTransferToPrepare(paymentId);
+    console.error('Error completing transaction:', error);
     throw error;
   }
+
+  return {
+    paymentId,
+    txHash,
+    status: 'completed'
+  };
 }
