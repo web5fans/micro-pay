@@ -4,7 +4,8 @@ import { initDb } from './db';
 import dotenv from 'dotenv';
 import { initPlatformAddresses } from './services/ckbService';
 import { startPaymentCleanupTask } from './services/paymentCleanupService';
-import { startPaymentCheckTask } from './services/paymentCheckService';
+import { startCkbTransactionCheckTask } from './services/ckbTransactionCheckService';
+import { startAccountCheckTask } from './services/accountService';
 
 // Load environment variables
 dotenv.config();
@@ -39,7 +40,11 @@ async function startServer() {
 
     // Start periodic check ckb transaction status
     // Check every 20 seconds, payments with status 'transfer' will be checked
-    startPaymentCheckTask(20);
+    startCkbTransactionCheckTask(20);
+
+    // Start periodic check account records
+    // Check every 4 * 60 * 60 seconds, account records with status 'transfer' will be checked
+    startAccountCheckTask(4 * 60 * 60);
     
     app.listen(port, () => {
       console.log(`Server is running at http://localhost:${port}`);

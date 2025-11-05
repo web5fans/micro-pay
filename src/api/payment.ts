@@ -8,7 +8,7 @@ export const paymentRouter = express.Router();
 // Payment preparation endpoint
 paymentRouter.post('/prepare', async (req: Request, res: Response) => {
   try {
-    console.log('Request body:', req.body);
+    console.log('prepare Request body:', req.body);
     const { sender, receiver, amount, splitReceivers, info } = req.body;
     
     // Validate request parameters
@@ -44,6 +44,7 @@ paymentRouter.post('/prepare', async (req: Request, res: Response) => {
 // Transfer endpoint
 paymentRouter.post('/transfer', async (req: Request, res: Response) => {
   try {
+    console.log('transfer Request body:', req.body);
     const { payment_id, signed_tx } = req.body;
     
     // Validate request parameters
@@ -77,10 +78,16 @@ paymentRouter.get('/:id', async (req: Request, res: Response) => {
     
     // Remove platform_address_index field from payment object
     const { platform_address_index, ...paymentWithoutIndex } = payment;
+
+    // remove platform_address_indexes field from each account object
+    const accountsWithoutIndex = accounts.map(account => {
+      const { platform_address_indexes, ...accountWithoutIndex } = account;
+      return accountWithoutIndex;
+    });
     
     res.json({
       payment: paymentWithoutIndex,
-      accounts
+      accounts: accountsWithoutIndex
     });
   } catch (error) {
     console.error('Error in get payment by id endpoint:', error);
@@ -114,10 +121,16 @@ paymentRouter.get('/receiver/:address', async (req: Request, res: Response) => {
   try {
     const address = req.params.address;
     
-    // Get payment records
-    const payments = await getAccountsByReceiver(address);
+    // Get account records
+    const accounts = await getAccountsByReceiver(address);
     
-    res.json(payments);
+    // Remove platform_address_indexes field from each account record
+    const accountsWithoutIndex = accounts.map(account => {
+      const { platform_address_indexes, ...accountWithoutIndex } = account;
+      return accountWithoutIndex;
+    });
+    
+    res.json(accountsWithoutIndex);
   } catch (error) {
     console.error('Error in get accounts by receiver endpoint:', error);
     res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });

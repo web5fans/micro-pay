@@ -40,8 +40,6 @@ export async function getAvailablePlatformAddressWithTransaction(client: PoolCli
       'UPDATE platform_address SET is_used = true, updated_at = NOW() WHERE id = (SELECT id FROM platform_address WHERE is_used = false LIMIT 1) RETURNING index, address',
       []
     );
-
-    console.log('getAvailablePlatformAddressWithTransaction result:', result);
     
     if (result.rows.length > 0) {
       const index = result.rows[0].index;

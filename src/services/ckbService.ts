@@ -226,8 +226,9 @@ export async function completeTransaction(platformAddressIndex: number, partSign
     const platformSigner = new ccc.SignerCkbPrivateKey(cccClient, platformPrivateKey);
 
     const signedTx = await platformSigner.signTransaction(tx);
+    console.log('signedTx:', signedTx);
 
-    const txHash = await platformSigner.sendTransaction(signedTx);
+    const txHash = await cccClient.sendTransaction(signedTx);
     
     return txHash;
   } catch (error) {
@@ -238,13 +239,133 @@ export async function completeTransaction(platformAddressIndex: number, partSign
   }
 }
 
+// platform address are all secp256k1
+function platformCellDep() {
+  return CKB_NETWORK === 'mainnet' ? {
+    outPoint: {
+      txHash:
+        "0x71a7ba8fc96349fea0ed3a5c47992e3b4084b031a42264a018e0072e8172e46c",
+      index: 0,
+    },
+    depType: "depGroup",
+  } : {
+    outPoint: {
+      txHash:
+        "0xf8de3bb47d055cdf460d93a2a6e1b05f7432f9777c8c474abf4eec1d4aee5d37",
+      index: 0,
+    },
+    depType: "depGroup",
+  };
+}
+
 // check transaction status
-export async function checkTransactionStatus(txHash: string): Promise<boolean> {
+//export type TransactionStatus =
+//  | "sent"
+//  | "pending"
+//  | "proposed"
+//  | "committed"
+//  | "unknown"
+//  | "rejected";
+export async function getTransactionStatus(txHash: string): Promise<string | undefined> {
   try {
     const txStatus = await cccClient.getTransaction(txHash);
-    return txStatus?.status === 'committed';
+    return txStatus?.status;
   } catch (error) {
     console.error('Error checking transaction status:', error);
+    throw error;
+  }
+}
+
+export async function AccountingTransaction(
+  receiverAddress: string,
+  platformAddressIndexes: number[],
+  totalAccountingAmount: bigint,
+  platformAmount: bigint
+) {
+  try {
+    const receiverAddr = await Address.fromString(receiverAddress, cccClient);
+    const receiverScript = receiverAddr.script;
+
+    // collect inputs and platform outputs
+    const inputs = [];
+    const outputs = [];
+    for (const index of platformAddressIndexes) {
+      const platformAddr = await Address.fromString(platformAddresses[index], cccClient);
+      const platformScript = platformAddr.script;
+      const platformSigner = new ccc.SignerCkbScriptReadonly(
+        cccClient,
+        platformScript
+      );
+      for await (const cell of platformSigner.findCells(
+        {},
+        false,
+        "asc",
+        2,
+      )) {
+        inputs.push({
+          previousOutput: cell.outPoint,
+          since: "0x0",
+        });
+        break; // each platform address only has one cell
+      }
+      outputs.push({
+        capacity: MIN_WITHDRAWAL_AMOUNT,
+        lock: platformScript,
+      });
+    }
+
+    // fixed fee
+    const fee = BigInt(20000);
+    // append receiver output
+    outputs.push({
+      capacity: totalAccountingAmount - fee,
+      lock: receiverScript,
+    });
+
+    // deal change
+    const change = platformAmount - totalAccountingAmount;
+    outputs[0].capacity += change;
+
+    // cell deps
+    const cellDeps = [
+      platformCellDep(),
+    ];
+
+    let tx = Transaction.from({
+      version: 0,
+      cellDeps: cellDeps,
+      inputs: inputs,
+      outputs: outputs,
+      outputsData: [],
+    });
+
+    // sign accounting transaction
+    for (const index of platformAddressIndexes) {
+      const platformPrivateKey = await getPrivateKey(index);
+      const platformSigner = new ccc.SignerCkbPrivateKey(cccClient, platformPrivateKey);
+      tx = await platformSigner.signTransaction(tx);
+    }
+
+    const rawTx = ccc.stringify(tx);
+    console.log('Accounting transaction:', rawTx);
+
+    const txHash = tx.hash();
+    return {
+      tx,
+      txHash
+    };
+  } catch (error) {
+    console.error('Error building accounting transaction:', error);
+    throw error;
+  }
+}
+
+export async function sendCkbTransaction(tx: Transaction) {
+  try {
+    const txHash = await cccClient.sendTransaction(tx);
+    return txHash;
+  } catch (error) {
+    console.error('Error sending transaction:', error);
     throw error;
   }
 }

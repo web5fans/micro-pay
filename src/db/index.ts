@@ -57,6 +57,7 @@ export async function initDb() {
         id SERIAL PRIMARY KEY,
         payment_id INTEGER NOT NULL REFERENCES payment(id),
         receiver TEXT NOT NULL,
+        platform_address_indexes TEXT DEFAULT '',
         amount BIGINT NOT NULL,
         info TEXT,
         status INTEGER NOT NULL DEFAULT 0,

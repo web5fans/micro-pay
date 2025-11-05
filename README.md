@@ -101,6 +101,7 @@ CREATE TABLE IF NOT EXISTS account(
     id BIGINT PRIMARY KEY,
     payment_id BIGINT,
     receiver TEXT,
+    platform_address_indexes TEXT,
     amount BIGINT,
     info TEXT,
     status INTEGER, // 0: prepare, 1: (payment) complete, 2: cancel, 3: accounting, 4: accounted
@@ -321,4 +322,5 @@ curl -X GET http://localhost:3000/api/payment/receiver/ckt1qzda0cr08m85hc8jlnfp3
 - [X] transfer要等tx确认
 - [X] 平台账户数量要可增加
 - [ ] 查询分页
-- [ ] 后台分账
+- [X] 后台分账
+- [X] 完善交易状态处理

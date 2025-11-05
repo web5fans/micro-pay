@@ -104,6 +104,8 @@ export async function completeTransfer(paymentId: number, partSignedTx: string) 
     throw new Error('Payment not found');
   }
 
+  console.log('completeTransfer payment:', payment);
+
   let txHash = "";
   try {
     // Complete transaction and send to chain
