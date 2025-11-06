@@ -37,7 +37,19 @@ export async function getAvailablePlatformAddressWithTransaction(client: PoolCli
   try {
     // Get an unused platform address from database
     const result = await client.query(
-      'UPDATE platform_address SET is_used = true, updated_at = NOW() WHERE id = (SELECT id FROM platform_address WHERE is_used = false LIMIT 1) RETURNING index, address',
+      `WITH candidate AS (
+         SELECT id, index, address
+         FROM platform_address
+         WHERE is_used IS FALSE
+         ORDER BY id
+         LIMIT 1
+         FOR UPDATE SKIP LOCKED
+       )
+       UPDATE platform_address pa
+       SET is_used = true, updated_at = NOW()
+       FROM candidate c
+       WHERE pa.id = c.id
+       RETURNING c.index, c.address`,
       []
     );
     
@@ -58,7 +70,19 @@ export async function getAvailablePlatformAddress() {
   try {
     // Get an unused platform address from database
     const result = await query(
-      'UPDATE platform_address SET is_used = true, updated_at = NOW() WHERE id = (SELECT id FROM platform_address WHERE is_used = false LIMIT 1) RETURNING index, address',
+      `WITH candidate AS (
+         SELECT id, index, address
+         FROM platform_address
+         WHERE is_used IS FALSE
+         ORDER BY id
+         LIMIT 1
+         FOR UPDATE SKIP LOCKED
+       )
+       UPDATE platform_address pa
+       SET is_used = true, updated_at = NOW()
+       FROM candidate c
+       WHERE pa.id = c.id
+       RETURNING c.index, c.address`,
       []
     );
     

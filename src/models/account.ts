@@ -38,24 +38,28 @@ export async function updateAccountStatusFromPrepareToCompleteWithTransaction(
   client: PoolClient,
   payment_id: number
 ) {
-  await client.query(
+  const result = await client.query(
     `UPDATE account
      SET status = 1, updated_at = NOW()
-     WHERE payment_id = $1 And status = 0`,
+     WHERE payment_id = $1 And status = 0
+     RETURNING *`,
     [payment_id]
   );
+  return result.rows;
 }
 
 export async function updateAccountStatusFromPrepareToCancelWithTransaction(
   client: PoolClient,
   payment_id: number
 ) {
-  await client.query(
+  const result = await client.query(
     `UPDATE account 
      SET status = 2, updated_at = NOW()
-     WHERE payment_id = $1 And status = 0`,
+     WHERE payment_id = $1 And status = 0
+     RETURNING *`,
     [payment_id]
   );
+  return result.rows;
 }
 
 export async function getAccountsByPaymentId(payment_id: number): Promise<Account[]> {
@@ -100,12 +104,14 @@ export async function updateTxHashAndPlatformAddressesIndexesForAccountingAccoun
   tx_hash: string,
   platform_address_indexes: string
 ) {
-  await client.query(
+  const result = await client.query(
     `UPDATE account
      SET tx_hash = $1, platform_address_indexes = $2, updated_at = NOW()
-     WHERE receiver = $3 And status = 3`,
+     WHERE receiver = $3 And status = 3
+     RETURNING *`,
     [tx_hash, platform_address_indexes, receiver]
   );
+  return result.rows;
 }
 
 // Get all accounting account recoreds
@@ -136,12 +142,14 @@ export async function updateAccountStatusFromAccountingToCompleteByTransactionHa
   client: PoolClient,
   tx_hash: string
 ) {
-  await client.query(
+  const result = await client.query(
     `UPDATE account
      SET status = 1, updated_at = NOW()
-     WHERE tx_hash = $1 And status = 3`,
+     WHERE tx_hash = $1 And status = 3
+     RETURNING *`,
     [tx_hash]
   );
+  return result.rows;
 }
 
 export async function getAccountsByReceiver(receiver: string): Promise<Account[]> {

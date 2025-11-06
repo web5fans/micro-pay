@@ -6,7 +6,10 @@
   "scripts": {
     "start": "ts-node src/index.ts",
     "build": "tsc",
-    "serve": "node dist/index.js"
+    "serve": "node dist/index.js",
+    "test:platform-address": "ts-node tests/platformAddress.concurrency.test.ts",
+    "test:payment": "ts-node tests/payment.concurrency.test.ts",
+    "test:account": "ts-node tests/account.concurrency.test.ts"
   },
   "keywords": [
     "ckb",

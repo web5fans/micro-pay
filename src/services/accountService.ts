@@ -59,7 +59,11 @@ export async function accountCheck(): Promise<void> {
           console.log(`[Account Check] accounting tx hash: ${txHash}`);
 
           // update account records with transaction hash and platform addresses indexes
-          await updateTxHashAndPlatformAddressesIndexesForAccountingAccountWithTransaction(client, account.receiver, txHash, platformAddressesIndexes.join(','));
+          const updated = await updateTxHashAndPlatformAddressesIndexesForAccountingAccountWithTransaction(client, account.receiver, txHash, platformAddressesIndexes.join(','));
+          if (updated.length === 0) {
+            console.log(`[Account Check] Failed to update accounting records with tx_hash`);
+            throw new Error(`Failed to update accounting records with tx_hash`);
+          }
 
           // send tx
           await sendCkbTransaction(tx);

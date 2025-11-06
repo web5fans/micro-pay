@@ -24,20 +24,28 @@ async function checkCkbTransactionStatus() {
       const txStatus = await getTransactionStatus(txHash);
       if (txStatus == 'committed') {
         await withTransaction(async (client) => {
+          // Update payment status to complete
+          const updated = await updatePaymentStatusFromTransferToCompleteWithTransaction(client, payment.id);
+          if (!updated) {
+            console.log(`[CKB Transaction Check] Payment ${payment.id} not in transfer, skip complete`);
+            return;
+          }
           // Release platform address
           await releasePlatformAddressWithTransaction(client, payment.platform_address_index);
-          // Update payment status to complete
-          await updatePaymentStatusFromTransferToCompleteWithTransaction(client, payment.id);
           // update account status to complete
           await updateAccountStatusFromPrepareToCompleteWithTransaction(client, payment.id);
         });
         console.log(`[CKB Transaction Check] Updated payment ${payment.id} status to complete`);
       } else if (txStatus == 'rejected') {
         await withTransaction(async (client) => {
+          // Update payment status to cancel
+          const updated = await updatePaymentStatusFromTransferToCancelWithTransaction(client, payment.id);
+          if (!updated) {
+            console.log(`[CKB Transaction Check] Payment ${payment.id} not in transfer, skip cancel`);
+            return;
+          }
           // Release platform address
           await releasePlatformAddressWithTransaction(client, payment.platform_address_index);
-          // Update payment status to cancel
-          await updatePaymentStatusFromTransferToCancelWithTransaction(client, payment.id);
           // update account status to cancel
           await updateAccountStatusFromPrepareToCancelWithTransaction(client, payment.id);
         });

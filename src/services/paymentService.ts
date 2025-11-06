@@ -1,6 +1,6 @@
 import { createPaymentWithTransaction, getUncompletedPaymentsBySender, updatePaymentStatusFromPrepareToTransfer, updatePaymentStatusFromTransferToPrepare } from '../models/payment';
 import { createAccountWithTransaction } from '../models/account';
-import { getAvailablePlatformAddress, releasePlatformAddress } from '../models/platformAddress';
+import { getAvailablePlatformAddressWithTransaction } from '../models/platformAddress';
 import { build2to2Transaction, completeTransaction, getAddressBalance, MIN_WITHDRAWAL_AMOUNT } from './ckbService';
 import { withTransaction } from '../db';
 
@@ -30,24 +30,24 @@ export async function preparePayment(
     throw new Error('Sender has an incomplete payment');
   }
 
-  // Get available platform address
-  const platformAddressRecord = await getAvailablePlatformAddress();
-  if (!platformAddressRecord) {
-    console.error('No available platform address found');
-    throw new Error('No available platform address');
-  }
-
   try {
-    // Build 2-2 transaction
-    const platformAddress = platformAddressRecord.address;
-    const { rawTx, txHash } = await build2to2Transaction(
+    // Use transaction to ensure DB operations atomicity including address allocation
+    const result = await withTransaction(async (client) => {
+      // Get available platform address within transaction (will rollback on error)
+      const platformAddressRecord = await getAvailablePlatformAddressWithTransaction(client);
+      if (!platformAddressRecord) {
+        console.error('No available platform address found');
+        throw new Error('No available platform address');
+      }
+
+      // Build 2-2 transaction
+      const platformAddress = platformAddressRecord.address;
+      const { rawTx, txHash } = await build2to2Transaction(
         senderAddress,
         platformAddress,
         BigInt(amount)
       );
 
-    // Use transaction to ensure database operations atomicity
-    const result = await withTransaction(async (client) => {
       // Calculate split ratio
       const totalSplitRate = splitReceivers ? splitReceivers.reduce((sum: number, item: { splitRate: number; }) => sum + item.splitRate, 0) : 0;
       const receiverSplitRate = 100 - totalSplitRate;
@@ -87,8 +87,6 @@ export async function preparePayment(
 
     return result;
   } catch (error) {
-    // Release platform address
-    await releasePlatformAddress(platformAddressRecord.index);
     if (error instanceof Error) {
       console.error('Error preparing payment:', error.message);
     }

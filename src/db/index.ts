@@ -78,6 +78,22 @@ export async function initDb() {
         updated_at TIMESTAMP NOT NULL DEFAULT NOW()
       )
     `, []);
+
+    // Concurrency-safety indexes
+    // Ensure at most one active payment per sender (prepare or transfer statuses)
+    await query(
+      `CREATE UNIQUE INDEX IF NOT EXISTS ux_payment_active_sender
+       ON payment(sender)
+       WHERE status IN (0,1)`,
+      []
+    );
+
+    // Ensure platform address index uniqueness
+    await query(
+      `CREATE UNIQUE INDEX IF NOT EXISTS ux_platform_address_index
+       ON platform_address(index)`,
+      []
+    );
     
     console.log('Database tables initialized successfully');
   } catch (error) {

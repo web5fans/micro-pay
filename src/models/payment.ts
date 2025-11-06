@@ -47,48 +47,56 @@ export async function updatePaymentStatusFromPrepareToTransfer(id: number): Prom
 }
 
 export async function updatePaymentStatusFromTransferToPrepare(id: number) {
-  await query(
+  const result = await query(
     `UPDATE payment
      SET status = 0, updated_at = NOW()
-     WHERE id = $1 AND status = 1`,
+     WHERE id = $1 AND status = 1
+     RETURNING *`,
     [id] 
   );
+  return result.rows[0] || null;
 }
 
 export async function updatePaymentStatusFromTransferToCompleteWithTransaction(
   client: PoolClient,
   id: number
 ) {
-  await client.query(
+  const result = await client.query(
     `UPDATE payment
      SET status = 2, updated_at = NOW()
-     WHERE id = $1 AND status = 1`,
+     WHERE id = $1 AND status = 1
+     RETURNING *`,
     [id] 
   );
+  return result.rows[0] || null;
 }
 
 export async function updatePaymentFromPrepareToCancelWithTransaction(
   client: PoolClient,
   id: number
 ) {
-  await client.query(
+  const result = await client.query(
     `UPDATE payment
      SET status = 3, updated_at = NOW()
-     WHERE id = $1 AND status = 0`,
+     WHERE id = $1 AND status = 0
+     RETURNING *`,
     [id] 
   );
+  return result.rows[0] || null;
 }
 
 export async function updatePaymentStatusFromTransferToCancelWithTransaction(
   client: PoolClient,
   id: number
 ) {
-  await client.query(
+  const result = await client.query(
     `UPDATE payment
      SET status = 3, updated_at = NOW()
-     WHERE id = $1 AND status = 1`,
+     WHERE id = $1 AND status = 1
+     RETURNING *`,
     [id] 
   );
+  return result.rows[0] || null;
 }
 
 export async function getPaymentById(id: number): Promise<Payment | null> {

@@ -28,7 +28,12 @@ export async function cleanupTimeoutPayments(timeoutSeconds: number = 60): Promi
 
         await withTransaction(async (client) => {
           // 1. Update payment status to cancel
-          await updatePaymentFromPrepareToCancelWithTransaction(client, payment.id);
+          const updated = await updatePaymentFromPrepareToCancelWithTransaction(client, payment.id);
+          if (!updated) {
+            // Payment was no longer in prepare; skip release/cancel
+            console.log(`[Payment Cleanup] Payment ${payment.id} not in prepare, skip release/cancel`);
+            return;
+          }
           // 2. Release platform address
           await releasePlatformAddressWithTransaction(client, payment.platform_address_index);
           // 3. update account status to cancel
