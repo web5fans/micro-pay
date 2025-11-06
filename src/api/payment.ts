@@ -65,17 +65,21 @@ paymentRouter.post('/prepare', async (req: Request, res: Response) => {
 paymentRouter.post('/transfer', async (req: Request, res: Response) => {
   try {
     console.log('transfer Request body:', req.body);
-    const { payment_id, signed_tx } = req.body;
+    const { paymentId, signedTx } = req.body;
     
     // Validate request parameters
-    if (!payment_id || typeof payment_id !== 'number' || !signed_tx || typeof signed_tx !== 'string') {
+    if (!paymentId || typeof paymentId !== 'number' || !signedTx || typeof signedTx !== 'string') {
       return res.status(400).json({ error: 'Missing or invalid parameters', code: ErrorCode.VALIDATION_ERROR });
     }
     
     // Complete transfer
-    const result = await completeTransfer(payment_id, signed_tx);
+    const result = await completeTransfer(paymentId, signedTx);
     
-    res.json(result);
+    res.json({
+      paymentId: result.paymentId,
+      txHash: result.txHash,
+      status: result.status,
+    });
   } catch (error) {
     console.error('Error in transfer endpoint:', error);
     const message = error instanceof Error ? error.message : 'Unknown error';

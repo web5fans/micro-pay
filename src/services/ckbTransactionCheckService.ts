@@ -36,7 +36,7 @@ async function checkCkbTransactionStatus() {
           await updateAccountStatusFromPrepareToCompleteWithTransaction(client, payment.id);
         });
         console.log(`[CKB Transaction Check] Updated payment ${payment.id} status to complete`);
-      } else if (txStatus == 'rejected') {
+      } else if (txStatus == 'rejected' || txStatus == 'unknown') {
         await withTransaction(async (client) => {
           // Update payment status to cancel
           const updated = await updatePaymentStatusFromTransferToCancelWithTransaction(client, payment.id);
@@ -50,6 +50,8 @@ async function checkCkbTransactionStatus() {
           await updateAccountStatusFromPrepareToCancelWithTransaction(client, payment.id);
         });
         console.log(`[CKB Transaction Check] Updated payment ${payment.id} status to cancel`);
+      } else {
+        console.log(`[CKB Transaction Check] Payment ${payment.id} tx_hash ${txHash} status ${txStatus}, skip`);
       }
     }
 
@@ -62,7 +64,11 @@ async function checkCkbTransactionStatus() {
       if (txStatus == 'committed') {
         await withTransaction(async (client) => {
           // update account status to complete
-          await updateAccountStatusFromAccountingToAccountedByTransactionHashWithTransaction(client, account.tx_hash!);
+          const updatedAccounts = await updateAccountStatusFromAccountingToAccountedByTransactionHashWithTransaction(client, account.tx_hash!);
+          if (updatedAccounts.length == 0) {
+            console.log(`[CKB Transaction Check] Account ${account.id} not in accounting, skip`);
+            return;
+          }
           // release platform address
           const platform_address_indexes = account.platform_address_indexes!.split(',');
           for (const index of platform_address_indexes) {
@@ -80,6 +86,8 @@ async function checkCkbTransactionStatus() {
           }
         });
         console.log(`[CKB Transaction Check] Updated account ${account.id} status back to complete`);  
+      } else {
+        console.log(`[CKB Transaction Check] Account ${account.id} tx_hash ${account.tx_hash} status ${txStatus}, skip`);
       }
     }
   } catch (error) {

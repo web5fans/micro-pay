@@ -19,15 +19,27 @@
 
 创建支付并分配平台地址（事务内分配与回滚保证地址不泄漏）。
 
-请求体（示例）：
+请求示例：
 
-```json
-{
-  "sender": "0xabc...",
-  "receiver": "0xdef...",
-  "amount": 100,
-  "splitRate": [10, 20]
-}
+```
+curl -s -X POST http://localhost:3000/api/payment/prepare \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sender": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqwu8lmjcalepgp5k6d4j0mtxwww68v9m6qz0q8ah",
+    "receiver": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqttz30qvq8rlht9r9wc6lqu27x6ykx5eyskhysra",
+    "amount": 5000000000,
+    "splitReceivers": [
+      {
+        "address": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsq0stn7whuvhjc2gm0frkjrg80wqac7xvlqf5qh7w",
+        "splitRate": 10
+      },
+      {
+        "address": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqfj3fq244fc9r82gt5hcka9ertn46pwkmgtu7ced",
+        "splitRate": 20
+      }
+    ],
+    "info": "post_id"
+  }' | jq .
 ```
 
 请求校验：
@@ -40,7 +52,9 @@
 
 ```json
 {
-  "payment_id": 123
+    "paymentId": 1,
+    "rawTx": "{\"version\":\"0x0\",\"cellDeps\":[{\"outPoint\":{\"txHash\":\"0xf8de3bb47d055cdf460d93a2a6e1b05f7432f9777c8c474abf4eec1d4aee5d37\",\"index\":\"0x0\"},\"depType\":\"depGroup\"}],\"headerDeps\":[],\"inputs\":[{\"previousOutput\":{\"txHash\":\"0x8904905ee742e3290aea1687a845a43e664b4154c1e90503e73795ee3da056c5\",\"index\":\"0x1\"},\"since\":\"0x0\",\"cellOutput\":{\"capacity\":\"0x33c211caf6\",\"lock\":{\"codeHash\":\"0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8\",\"hashType\":\"type\",\"args\":\"0xdc3ff72c77f90a034b69b593f6b339ced1d85de8\"}},\"outputData\":\"0x\"},{\"previousOutput\":{\"txHash\":\"0x1aa3b137e73e324f3e9e38e1ceb5c60285718fe0c06c8dc00a985fdc48f96f5b\",\"index\":\"0x0\"},\"since\":\"0x0\",\"cellOutput\":{\"capacity\":\"0x37e11d600\",\"lock\":{\"codeHash\":\"0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8\",\"hashType\":\"type\",\"args\":\"0xf1e5e5641a3810fefaccaae4076f91a5de444726\"}},\"outputData\":\"0x\"}],\"outputs\":[{\"capacity\":\"0x4a817c800\",\"lock\":{\"codeHash\":\"0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8\",\"hashType\":\"type\",\"args\":\"0xf1e5e5641a3810fefaccaae4076f91a5de444726\"}},{\"capacity\":\"0x32980bb1e6\",\"lock\":{\"codeHash\":\"0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8\",\"hashType\":\"type\",\"args\":\"0xdc3ff72c77f90a034b69b593f6b339ced1d85de8\"}}],\"outputsData\":[\"0x\",\"0x\"],\"witnesses\":[\"0x690000001000000069000000690000005500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\",\"0x690000001000000069000000690000005500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\"]}",
+    "txHash": "0xde69658e2e9dc1c9d5708219e8cb1251455a7d52835580946c8ee88877bd9ae2"
 }
 ```
 
@@ -86,26 +100,29 @@
 
 对 `prepare` 的支付执行链上签名交易并更新状态。
 
-请求体（示例）：
+请求示例：
 
-```json
-{
-  "payment_id": 123,
-  "signed_tx": "0xdeadbeef..."
-}
+```
+curl -s -X POST http://localhost:3000/api/payment/transfer \
+  -H "Content-Type: application/json" \
+  -d '{
+    "paymentId": 1,
+    "signedTx": "{\"version\":\"0x0\",\"cellDeps\":[{\"outPoint\":{\"txHash\":\"0xf8de3bb47d055cdf460d93a2a6e1b05f7432f9777c8c474abf4eec1d4aee5d37\",\"index\":\"0x0\"},\"depType\":\"depGroup\"}],\"headerDeps\":[],\"inputs\":[{\"previousOutput\":{\"txHash\":\"0x8904905ee742e3290aea1687a845a43e664b4154c1e90503e73795ee3da056c5\",\"index\":\"0x1\"},\"since\":\"0x0\",\"cellOutput\":{\"capacity\":\"0x33c211caf6\",\"lock\":{\"codeHash\":\"0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8\",\"hashType\":\"type\",\"args\":\"0xdc3ff72c77f90a034b69b593f6b339ced1d85de8\"}},\"outputData\":\"0x\"},{\"previousOutput\":{\"txHash\":\"0x1aa3b137e73e324f3e9e38e1ceb5c60285718fe0c06c8dc00a985fdc48f96f5b\",\"index\":\"0x0\"},\"since\":\"0x0\",\"cellOutput\":{\"capacity\":\"0x37e11d600\",\"lock\":{\"codeHash\":\"0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8\",\"hashType\":\"type\",\"args\":\"0xf1e5e5641a3810fefaccaae4076f91a5de444726\"}},\"outputData\":\"0x\"}],\"outputs\":[{\"capacity\":\"0x4a817c800\",\"lock\":{\"codeHash\":\"0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8\",\"hashType\":\"type\",\"args\":\"0xf1e5e5641a3810fefaccaae4076f91a5de444726\"}},{\"capacity\":\"0x32980bb1e6\",\"lock\":{\"codeHash\":\"0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8\",\"hashType\":\"type\",\"args\":\"0xdc3ff72c77f90a034b69b593f6b339ced1d85de8\"}}],\"outputsData\":[\"0x\",\"0x\"],\"witnesses\":[\"0x5500000010000000550000005500000041000000e8fc4eab157208950f1d4486fdac53eed25a9d79ada02bbaded6b221f77ed68250a0634b67e161a0461a12a28e113820b0b544cfdc0864b2650ff2c16e6790c100\",\"0x690000001000000069000000690000005500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\"]}"
+  }' | jq .
 ```
 
 请求校验：
 
-- `payment_id` 必须为数字。
-- `signed_tx` 必须为字符串，不能为空。
+- `paymentId` 必须为数字。
+- `signedTx` 必须为字符串，不能为空。
 
 成功响应（示例）：
 
 ```json
 {
-  "payment_id": 123,
-  "status": "transfer"
+    "paymentId": 1,
+    "txHash": "0xde69658e2e9dc1c9d5708219e8cb1251455a7d52835580946c8ee88877bd9ae2",
+    "status": "completed"
 }
 ```
 
@@ -150,8 +167,52 @@
 
 ```json
 {
-  "payment": { /* 去除 platform_address_index 字段 */ },
-  "accounts": [ /* 每条记录去除 platform_address_indexes 字段 */ ]
+    "payment": {
+        "id": 1,
+        "sender": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqwu8lmjcalepgp5k6d4j0mtxwww68v9m6qz0q8ah",
+        "receiver": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqttz30qvq8rlht9r9wc6lqu27x6ykx5eyskhysra",
+        "amount": "5000000000",
+        "info": "post_id",
+        "status": 2,
+        "tx_hash": "0xde69658e2e9dc1c9d5708219e8cb1251455a7d52835580946c8ee88877bd9ae2",
+        "created_at": "2025-11-06T05:53:30.781Z",
+        "updated_at": "2025-11-06T05:57:10.937Z"
+    },
+    "accounts": [
+        {
+            "id": 1,
+            "payment_id": 1,
+            "receiver": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsq0stn7whuvhjc2gm0frkjrg80wqac7xvlqf5qh7w",
+            "amount": "500000000",
+            "info": "post_id",
+            "status": 1,
+            "tx_hash": null,
+            "created_at": "2025-11-06T05:53:30.781Z",
+            "updated_at": "2025-11-06T05:57:10.937Z"
+        },
+        {
+            "id": 2,
+            "payment_id": 1,
+            "receiver": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqfj3fq244fc9r82gt5hcka9ertn46pwkmgtu7ced",
+            "amount": "1000000000",
+            "info": "post_id",
+            "status": 1,
+            "tx_hash": null,
+            "created_at": "2025-11-06T05:53:30.781Z",
+            "updated_at": "2025-11-06T05:57:10.937Z"
+        },
+        {
+            "id": 3,
+            "payment_id": 1,
+            "receiver": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqttz30qvq8rlht9r9wc6lqu27x6ykx5eyskhysra",
+            "amount": "3500000000",
+            "info": "post_id",
+            "status": 1,
+            "tx_hash": null,
+            "created_at": "2025-11-06T05:53:30.781Z",
+            "updated_at": "2025-11-06T05:57:10.937Z"
+        }
+    ]
 }
 ```
 
@@ -172,10 +233,24 @@
 
 ```json
 {
-  "items": [
-    { /* payment 去除 platform_address_index 字段 */ }
-  ],
-  "pagination": { "limit": 20, "offset": 0, "count": 1 }
+    "items": [
+        {
+            "id": 1,
+            "sender": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqwu8lmjcalepgp5k6d4j0mtxwww68v9m6qz0q8ah",
+            "receiver": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqttz30qvq8rlht9r9wc6lqu27x6ykx5eyskhysra",
+            "amount": "5000000000",
+            "info": "post_id",
+            "status": 2,
+            "tx_hash": "0xde69658e2e9dc1c9d5708219e8cb1251455a7d52835580946c8ee88877bd9ae2",
+            "created_at": "2025-11-06T05:53:30.781Z",
+            "updated_at": "2025-11-06T05:57:10.937Z"
+        }
+    ],
+    "pagination": {
+        "limit": 20,
+        "offset": 0,
+        "count": 1
+    }
 }
 ```
 
@@ -185,9 +260,23 @@
 
 ```json
 {
-  "items": [
-    { /* account 去除 platform_address_indexes 字段 */ }
-  ],
-  "pagination": { "limit": 20, "offset": 0, "count": 1 }
+    "items": [
+        {
+            "id": 3,
+            "payment_id": 1,
+            "receiver": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqttz30qvq8rlht9r9wc6lqu27x6ykx5eyskhysra",
+            "amount": "3500000000",
+            "info": "post_id",
+            "status": 1,
+            "tx_hash": null,
+            "created_at": "2025-11-06T05:53:30.781Z",
+            "updated_at": "2025-11-06T05:57:10.937Z"
+        }
+    ],
+    "pagination": {
+        "limit": 20,
+        "offset": 0,
+        "count": 1
+    }
 }
 ```

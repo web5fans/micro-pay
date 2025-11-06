@@ -128,13 +128,15 @@ export async function getAccountingAccounts(): Promise<Account[]> {
 export async function updateAccountStatusFromAccountingToAccountedByTransactionHashWithTransaction(
   client: PoolClient,
   tx_hash: string
-) {
-  await client.query(
+) : Promise<Account[]> {
+  const result = await client.query(
     `UPDATE account
      SET status = 4, updated_at = NOW()
-     WHERE tx_hash = $1 And status = 3`,
+     WHERE tx_hash = $1 And status = 3
+     RETURNING *`,
     [tx_hash]
   );
+  return result.rows;
 }
 
 // Update account status to complete (transaction version)

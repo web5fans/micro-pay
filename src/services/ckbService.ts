@@ -1,4 +1,4 @@
-import { Address, ccc, CellDepLike, hexFrom, Transaction } from "@ckb-ccc/core";
+import { Address, ccc, CellDepLike, hexFrom, KnownScript, Transaction } from "@ckb-ccc/core";
 import { HDKey } from "@scure/bip32";
 import * as bip39 from "@scure/bip39";
 import { wordlist } from '@scure/bip39/wordlists/english.js';
@@ -196,6 +196,10 @@ export async function build2to2Transaction(
       outputsData: [],
     });
 
+    // prepare witnesses
+    await tx.prepareSighashAllWitness(senderAddr.script, 85, cccClient);
+    await tx.prepareSighashAllWitness(platformAddr.script, 85, cccClient);
+
     const rawTx = ccc.stringify(tx);
     console.log('Raw transaction:', rawTx);
     
@@ -237,25 +241,6 @@ export async function completeTransaction(platformAddressIndex: number, partSign
     }
     throw error;
   }
-}
-
-// platform address are all secp256k1
-function platformCellDep() {
-  return CKB_NETWORK === 'mainnet' ? {
-    outPoint: {
-      txHash:
-        "0x71a7ba8fc96349fea0ed3a5c47992e3b4084b031a42264a018e0072e8172e46c",
-      index: 0,
-    },
-    depType: "depGroup",
-  } : {
-    outPoint: {
-      txHash:
-        "0xf8de3bb47d055cdf460d93a2a6e1b05f7432f9777c8c474abf4eec1d4aee5d37",
-      index: 0,
-    },
-    depType: "depGroup",
-  };
 }
 
 // check transaction status
@@ -300,13 +285,12 @@ export async function AccountingTransaction(
         {},
         false,
         "asc",
-        2,
+        10,
       )) {
         inputs.push({
           previousOutput: cell.outPoint,
           since: "0x0",
         });
-        break; // each platform address only has one cell
       }
       outputs.push({
         capacity: MIN_WITHDRAWAL_AMOUNT,
@@ -326,18 +310,16 @@ export async function AccountingTransaction(
     const change = platformAmount - totalAccountingAmount;
     outputs[0].capacity += change;
 
-    // cell deps
-    const cellDeps = [
-      platformCellDep(),
-    ];
-
     let tx = Transaction.from({
       version: 0,
-      cellDeps: cellDeps,
+      cellDeps: [],
       inputs: inputs,
       outputs: outputs,
       outputsData: [],
     });
+
+    // platform addresses are all secp256k1
+    tx.addCellDepsOfKnownScripts(cccClient, KnownScript.Secp256k1Blake160);
 
     // sign accounting transaction
     for (const index of platformAddressIndexes) {

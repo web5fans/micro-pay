@@ -185,7 +185,7 @@ OK
 
 2. 转账准备接口
 ```
-curl -X POST http://localhost:3000/api/payment/prepare \
+curl -s -X POST http://localhost:3000/api/payment/prepare \
   -H "Content-Type: application/json" \
   -d '{
     "sender": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqwu8lmjcalepgp5k6d4j0mtxwww68v9m6qz0q8ah",
@@ -202,38 +202,38 @@ curl -X POST http://localhost:3000/api/payment/prepare \
       }
     ],
     "info": "post_id"
-  }'
+  }' | jq .
 ```
 响应
 ```
 {
-    "paymentId": 1,
-    "rawTx": "{\"version\":\"0x0\",\"cellDeps\":[{\"outPoint\":{\"txHash\":\"0xf8de3bb47d055cdf460d93a2a6e1b05f7432f9777c8c474abf4eec1d4aee5d37\",\"index\":\"0x0\"},\"depType\":\"depGroup\"}],\"headerDeps\":[],\"inputs\":[{\"previousOutput\":{\"txHash\":\"0x891eecbe4d70c0ded9789989cece2e3ff6caa536c29921ca082ec384f4efe524\",\"index\":\"0x1\"},\"since\":\"0x0\"},{\"previousOutput\":{\"txHash\":\"0x59b600708c1b8eeb1f9f497a5bf282fce4b7c161b02c3c6bef05f3854518e47f\",\"index\":\"0x0\"},\"since\":\"0x0\"}],\"outputs\":[{\"capacity\":\"0x1faa3b500\",\"lock\":{\"codeHash\":\"0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8\",\"hashType\":\"type\",\"args\":\"0xf1e5e5641a3810fefaccaae4076f91a5de444726\"}},{\"capacity\":\"0x34ec1a06e6\",\"lock\":{\"codeHash\":\"0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8\",\"hashType\":\"type\",\"args\":\"0xdc3ff72c77f90a034b69b593f6b339ced1d85de8\"}}],\"outputsData\":[\"0x\",\"0x\"],\"witnesses\":[]}",
-    "txHash": "0xd0380b1ec36607030889d4749ae08b01e309e3af24bbc144338588b9a9b489fe"
+    "paymentId": 3,
+    "rawTx": "{\"version\":\"0x0\",\"cellDeps\":[{\"outPoint\":{\"txHash\":\"0xf8de3bb47d055cdf460d93a2a6e1b05f7432f9777c8c474abf4eec1d4aee5d37\",\"index\":\"0x0\"},\"depType\":\"depGroup\"}],\"headerDeps\":[],\"inputs\":[{\"previousOutput\":{\"txHash\":\"0x8904905ee742e3290aea1687a845a43e664b4154c1e90503e73795ee3da056c5\",\"index\":\"0x1\"},\"since\":\"0x0\",\"cellOutput\":{\"capacity\":\"0x33c211caf6\",\"lock\":{\"codeHash\":\"0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8\",\"hashType\":\"type\",\"args\":\"0xdc3ff72c77f90a034b69b593f6b339ced1d85de8\"}},\"outputData\":\"0x\"},{\"previousOutput\":{\"txHash\":\"0x1aa3b137e73e324f3e9e38e1ceb5c60285718fe0c06c8dc00a985fdc48f96f5b\",\"index\":\"0x0\"},\"since\":\"0x0\",\"cellOutput\":{\"capacity\":\"0x37e11d600\",\"lock\":{\"codeHash\":\"0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8\",\"hashType\":\"type\",\"args\":\"0xf1e5e5641a3810fefaccaae4076f91a5de444726\"}},\"outputData\":\"0x\"}],\"outputs\":[{\"capacity\":\"0x4a817c800\",\"lock\":{\"codeHash\":\"0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8\",\"hashType\":\"type\",\"args\":\"0xf1e5e5641a3810fefaccaae4076f91a5de444726\"}},{\"capacity\":\"0x32980bb1e6\",\"lock\":{\"codeHash\":\"0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8\",\"hashType\":\"type\",\"args\":\"0xdc3ff72c77f90a034b69b593f6b339ced1d85de8\"}}],\"outputsData\":[\"0x\",\"0x\"],\"witnesses\":[\"0x690000001000000069000000690000005500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\",\"0x690000001000000069000000690000005500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\"]}",
+    "txHash": "0xde69658e2e9dc1c9d5708219e8cb1251455a7d52835580946c8ee88877bd9ae2"
 }
 ```
 
 3. 转账接口
 ```
-curl -X POST http://localhost:3000/api/payment/transfer \
+curl -s -X POST http://localhost:3000/api/payment/transfer \
   -H "Content-Type: application/json" \
   -d '{
-    "payment_id": 1,
-    "signed_tx": "{\"version\":\"0x0\",\"cellDeps\":[{\"outPoint\":{\"txHash\":\"0xf8de3bb47d055cdf460d93a2a6e1b05f7432f9777c8c474abf4eec1d4aee5d37\",\"index\":\"0x0\"},\"depType\":\"depGroup\"}],\"headerDeps\":[],\"inputs\":[{\"previousOutput\":{\"txHash\":\"0xc07f339210e37c552f88ddb6ee4de20f32783fd18d4828fdfc94321136b688fa\",\"index\":\"0x1\"},\"since\":\"0x0\",\"cellOutput\":{\"capacity\":\"0x2540a0f40\",\"lock\":{\"codeHash\":\"0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8\",\"hashType\":\"type\",\"args\":\"0xdc3ff72c77f90a034b69b593f6b339ced1d85de8\"}},\"outputData\":\"0x\"},{\"previousOutput\":{\"txHash\":\"0x85d2962750b3a05fd1cd02ccd833df6329a0e67621e464e49b2199332b3ca0d9\",\"index\":\"0x1\"},\"since\":\"0x0\",\"cellOutput\":{\"capacity\":\"0x33c213edd6\",\"lock\":{\"codeHash\":\"0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8\",\"hashType\":\"type\",\"args\":\"0xdc3ff72c77f90a034b69b593f6b339ced1d85de8\"}},\"outputData\":\"0x\"},{\"previousOutput\":{\"txHash\":\"0x20141eaab405f4d704d20047196d5915d7044ba86f2420e0162315c27bf1278c\",\"index\":\"0x0\"},\"since\":\"0x0\",\"cellOutput\":{\"capacity\":\"0x2540be400\",\"lock\":{\"codeHash\":\"0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8\",\"hashType\":\"type\",\"args\":\"0xf1e5e5641a3810fefaccaae4076f91a5de444726\"}},\"outputData\":\"0x\"}],\"outputs\":[{\"capacity\":\"0x37e11d600\",\"lock\":{\"codeHash\":\"0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8\",\"hashType\":\"type\",\"args\":\"0xf1e5e5641a3810fefaccaae4076f91a5de444726\"}},{\"capacity\":\"0x34ec17e406\",\"lock\":{\"codeHash\":\"0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8\",\"hashType\":\"type\",\"args\":\"0xdc3ff72c77f90a034b69b593f6b339ced1d85de8\"}}],\"outputsData\":[\"0x\",\"0x\"],\"witnesses\":[\"0x5500000010000000550000005500000041000000d1251dc5ae2c9130efc0b43e79dbdba753f4a390bfb9a0d67d9571a51eb743f718a2184ed83e0631a99be83459c891bd39d410ede6a9110bbcfcf18b12026f2b01\"]}"
-  }'
+    "paymentId": 5,
+    "signedTx": "{\"version\":\"0x0\",\"cellDeps\":[{\"outPoint\":{\"txHash\":\"0xf8de3bb47d055cdf460d93a2a6e1b05f7432f9777c8c474abf4eec1d4aee5d37\",\"index\":\"0x0\"},\"depType\":\"depGroup\"}],\"headerDeps\":[],\"inputs\":[{\"previousOutput\":{\"txHash\":\"0x154c91a133d8e82a7515c998cc5cba3cdf5838cd35bfa70f2860fb657a4ed641\",\"index\":\"0x1\"},\"since\":\"0x0\",\"cellOutput\":{\"capacity\":\"0x2deff374b6\",\"lock\":{\"codeHash\":\"0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8\",\"hashType\":\"type\",\"args\":\"0xdc3ff72c77f90a034b69b593f6b339ced1d85de8\"}},\"outputData\":\"0x\"},{\"previousOutput\":{\"txHash\":\"0x154c91a133d8e82a7515c998cc5cba3cdf5838cd35bfa70f2860fb657a4ed641\",\"index\":\"0x0\"},\"since\":\"0x0\",\"cellOutput\":{\"capacity\":\"0x8f6c76100\",\"lock\":{\"codeHash\":\"0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8\",\"hashType\":\"type\",\"args\":\"0xf1e5e5641a3810fefaccaae4076f91a5de444726\"}},\"outputData\":\"0x\"}],\"outputs\":[{\"capacity\":\"0xa20cd5300\",\"lock\":{\"codeHash\":\"0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8\",\"hashType\":\"type\",\"args\":\"0xf1e5e5641a3810fefaccaae4076f91a5de444726\"}},{\"capacity\":\"0x2cc5ed5ba6\",\"lock\":{\"codeHash\":\"0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8\",\"hashType\":\"type\",\"args\":\"0xdc3ff72c77f90a034b69b593f6b339ced1d85de8\"}}],\"outputsData\":[\"0x\",\"0x\"],\"witnesses\":[\"0x55000000100000005500000055000000410000005bee5cf44a83f35de7061e5b6ae5a9dd1c06b72bd28f57f22ad863db9e00de3e67a5c282591858c03a58f62bdc9a3e31db56d0aaf151263f457fcf98b73f317100\",\"0x690000001000000069000000690000005500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\"]}"
+  }' | jq .
 ```
 响应
 ```
 {
-    "paymentId": "1",
-    "txHash": "0xd0380b1ec36607030889d4749ae08b01e309e3af24bbc144338588b9a9b489fe",
+    "paymentId": 1,
+    "txHash": "0xde69658e2e9dc1c9d5708219e8cb1251455a7d52835580946c8ee88877bd9ae2",
     "status": "completed"
 }
 ```
 
 4. 根据支付id查询支付记录
 ```
-curl -X GET http://localhost:3000/api/payment/1
+curl -s -X GET http://localhost:3000/api/payment/1 | jq .
 ```
 响应
 ```
@@ -242,46 +242,46 @@ curl -X GET http://localhost:3000/api/payment/1
         "id": 1,
         "sender": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqwu8lmjcalepgp5k6d4j0mtxwww68v9m6qz0q8ah",
         "receiver": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqttz30qvq8rlht9r9wc6lqu27x6ykx5eyskhysra",
-        "amount": "1000000000",
+        "amount": "5000000000",
         "info": "post_id",
         "status": 2,
-        "tx_hash": "0xd0380b1ec36607030889d4749ae08b01e309e3af24bbc144338588b9a9b489fe",
-        "created_at": "2025-11-03T05:25:50.115Z",
-        "updated_at": "2025-11-03T05:27:12.099Z"
+        "tx_hash": "0xde69658e2e9dc1c9d5708219e8cb1251455a7d52835580946c8ee88877bd9ae2",
+        "created_at": "2025-11-06T05:53:30.781Z",
+        "updated_at": "2025-11-06T05:57:10.937Z"
     },
     "accounts": [
         {
             "id": 1,
             "payment_id": 1,
             "receiver": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsq0stn7whuvhjc2gm0frkjrg80wqac7xvlqf5qh7w",
-            "amount": "100000000",
+            "amount": "500000000",
             "info": "post_id",
             "status": 1,
             "tx_hash": null,
-            "created_at": "2025-11-03T05:25:50.115Z",
-            "updated_at": "2025-11-03T05:27:12.099Z"
+            "created_at": "2025-11-06T05:53:30.781Z",
+            "updated_at": "2025-11-06T05:57:10.937Z"
         },
         {
             "id": 2,
             "payment_id": 1,
             "receiver": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqfj3fq244fc9r82gt5hcka9ertn46pwkmgtu7ced",
-            "amount": "200000000",
+            "amount": "1000000000",
             "info": "post_id",
             "status": 1,
             "tx_hash": null,
-            "created_at": "2025-11-03T05:25:50.115Z",
-            "updated_at": "2025-11-03T05:27:12.099Z"
+            "created_at": "2025-11-06T05:53:30.781Z",
+            "updated_at": "2025-11-06T05:57:10.937Z"
         },
         {
             "id": 3,
             "payment_id": 1,
             "receiver": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqttz30qvq8rlht9r9wc6lqu27x6ykx5eyskhysra",
-            "amount": "700000000",
+            "amount": "3500000000",
             "info": "post_id",
             "status": 1,
             "tx_hash": null,
-            "created_at": "2025-11-03T05:25:50.115Z",
-            "updated_at": "2025-11-03T05:27:12.099Z"
+            "created_at": "2025-11-06T05:53:30.781Z",
+            "updated_at": "2025-11-06T05:57:10.937Z"
         }
     ]
 }
@@ -289,44 +289,58 @@ curl -X GET http://localhost:3000/api/payment/1
 
 5. 根据发送者地址查询发送的支付记录
 ``` 
-curl -X GET http://localhost:3000/api/payment/sender/ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqwu8lmjcalepgp5k6d4j0mtxwww68v9m6qz0q8ah
+curl -s -X GET http://localhost:3000/api/payment/sender/ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqwu8lmjcalepgp5k6d4j0mtxwww68v9m6qz0q8ah | jq .
 ```
 响应
 ```
-[
-    {
-        "id": 1,
-        "sender": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqwu8lmjcalepgp5k6d4j0mtxwww68v9m6qz0q8ah",
-        "receiver": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqttz30qvq8rlht9r9wc6lqu27x6ykx5eyskhysra",
-        "amount": "1000000000",
-        "info": "post_id",
-        "status": 2,
-        "tx_hash": "0xd0380b1ec36607030889d4749ae08b01e309e3af24bbc144338588b9a9b489fe",
-        "created_at": "2025-11-03T05:25:50.115Z",
-        "updated_at": "2025-11-03T05:27:12.099Z"
+{
+    "items": [
+        {
+            "id": 1,
+            "sender": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqwu8lmjcalepgp5k6d4j0mtxwww68v9m6qz0q8ah",
+            "receiver": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqttz30qvq8rlht9r9wc6lqu27x6ykx5eyskhysra",
+            "amount": "5000000000",
+            "info": "post_id",
+            "status": 2,
+            "tx_hash": "0xde69658e2e9dc1c9d5708219e8cb1251455a7d52835580946c8ee88877bd9ae2",
+            "created_at": "2025-11-06T05:53:30.781Z",
+            "updated_at": "2025-11-06T05:57:10.937Z"
+        }
+    ],
+    "pagination": {
+        "limit": 20,
+        "offset": 0,
+        "count": 1
     }
-]
+}
 ``` 
 
 6. 根据接收者地址查询分账记录
 ``` 
-curl -X GET http://localhost:3000/api/payment/receiver/ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqttz30qvq8rlht9r9wc6lqu27x6ykx5eyskhysra
+curl -s -X GET http://localhost:3000/api/payment/receiver/ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqttz30qvq8rlht9r9wc6lqu27x6ykx5eyskhysra | jq .
 ```
 响应
 ```
-[
-    {
-        "id": 3,
-        "payment_id": 1,
-        "receiver": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqttz30qvq8rlht9r9wc6lqu27x6ykx5eyskhysra",
-        "amount": "700000000",
-        "info": "post_id",
-        "status": 1,
-        "tx_hash": null,
-        "created_at": "2025-11-03T05:25:50.115Z",
-        "updated_at": "2025-11-03T05:27:12.099Z"
+{
+    "items": [
+        {
+            "id": 3,
+            "payment_id": 1,
+            "receiver": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqttz30qvq8rlht9r9wc6lqu27x6ykx5eyskhysra",
+            "amount": "3500000000",
+            "info": "post_id",
+            "status": 1,
+            "tx_hash": null,
+            "created_at": "2025-11-06T05:53:30.781Z",
+            "updated_at": "2025-11-06T05:57:10.937Z"
+        }
+    ],
+    "pagination": {
+        "limit": 20,
+        "offset": 0,
+        "count": 1
     }
-]
+}
 ``` 
 
 
