@@ -99,7 +99,8 @@ export async function completeTransfer(paymentId: number, partSignedTx: string) 
   // Update payment status to transfer
   const payment = await updatePaymentStatusFromPrepareToTransfer(paymentId);
   if (!payment) {
-    throw new Error('Payment not found');
+    // Payment exists but not in expected state (prepare)
+    throw new Error('Payment not in prepare');
   }
 
   console.log('completeTransfer payment:', payment);

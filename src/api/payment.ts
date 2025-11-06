@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import { preparePayment, completeTransfer } from '../services/paymentService';
 import { getPaymentById, getPaymentsBySender } from '../models/payment';
 import { getAccountsByPaymentId, getAccountsByReceiver } from '../models/account';
+import { ErrorCode } from './errorCodes';
 
 export const paymentRouter = express.Router();
 
@@ -12,8 +13,11 @@ paymentRouter.post('/prepare', async (req: Request, res: Response) => {
     const { sender, receiver, amount, splitReceivers, info } = req.body;
     
     // Validate request parameters
-    if (!sender || !receiver || !amount) {
-      return res.status(400).json({ error: 'Missing required parameters' });
+    if (!sender || typeof sender !== 'string' || !receiver || typeof receiver !== 'string') {
+      return res.status(400).json({ error: 'Missing or invalid parameters', code: ErrorCode.VALIDATION_ERROR });
+    }
+    if (typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0) {
+      return res.status(400).json({ error: 'Invalid amount', code: ErrorCode.VALIDATION_ERROR });
     }
     
     // Validate splitReceivers format
@@ -28,7 +32,7 @@ paymentRouter.post('/prepare', async (req: Request, res: Response) => {
     // Calculate splitRate sum
     const totalSplitRate = splitReceivers ? splitReceivers.reduce((sum: number, item: { splitRate: number; }) => sum + item.splitRate, 0) : 0;
     if (totalSplitRate >= 100) {
-      return res.status(400).json({ error: 'splitRate sum must be less than 100' });
+      return res.status(400).json({ error: 'splitRate sum must be less than 100', code: ErrorCode.VALIDATION_ERROR });
     }
     
     // Prepare payment
@@ -37,7 +41,23 @@ paymentRouter.post('/prepare', async (req: Request, res: Response) => {
     res.json(result);
   } catch (error) {
     console.error('Error in prepare payment endpoint:', error);
-    res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    // Unique violation due to concurrent active payment
+    if ((error as any)?.code === '23505') {
+      return res.status(409).json({ error: 'Sender has an active payment', code: ErrorCode.DUPLICATE_ACTIVE_PAYMENT });
+    }
+    // Business conflicts and resource errors
+    if (message.includes('incomplete payment')) {
+      return res.status(409).json({ error: message, code: ErrorCode.INCOMPLETE_PAYMENT_EXISTS });
+    }
+    if (message.includes('does not have enough balance')) {
+      return res.status(422).json({ error: message, code: ErrorCode.INSUFFICIENT_BALANCE });
+    }
+    if (message.includes('No available platform address')) {
+      return res.status(503).json({ error: message, code: ErrorCode.NO_PLATFORM_ADDRESS });
+    }
+    // Default to internal error
+    res.status(500).json({ error: message, code: ErrorCode.INTERNAL_ERROR });
   }
 });
 
@@ -48,8 +68,8 @@ paymentRouter.post('/transfer', async (req: Request, res: Response) => {
     const { payment_id, signed_tx } = req.body;
     
     // Validate request parameters
-    if (!payment_id || !signed_tx) {
-      return res.status(400).json({ error: 'Missing required parameters' });
+    if (!payment_id || typeof payment_id !== 'number' || !signed_tx || typeof signed_tx !== 'string') {
+      return res.status(400).json({ error: 'Missing or invalid parameters', code: ErrorCode.VALIDATION_ERROR });
     }
     
     // Complete transfer
@@ -58,7 +78,16 @@ paymentRouter.post('/transfer', async (req: Request, res: Response) => {
     res.json(result);
   } catch (error) {
     console.error('Error in transfer endpoint:', error);
-    res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    // State mismatch: not in prepare when trying to transfer
+    if (message === 'Payment not in prepare') {
+      return res.status(409).json({ error: message, code: ErrorCode.STATE_MISMATCH });
+    }
+    // External transaction processing error
+    if (message.toLowerCase().includes('transaction') || message.toLowerCase().includes('send')) {
+      return res.status(502).json({ error: message, code: ErrorCode.CHAIN_ERROR });
+    }
+    res.status(500).json({ error: message, code: ErrorCode.INTERNAL_ERROR });
   }
 });
 

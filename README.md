@@ -157,6 +157,21 @@ bash dev_db.sh
 npm start
 ```
 
+## API 文档与错误码
+
+详见 `docs/API.md` 获取完整的接口说明、请求校验、错误码与示例响应。
+
+错误码快速参考：
+
+- `DUPLICATE_ACTIVE_PAYMENT` (409) — 发送者存在活跃支付
+- `INCOMPLETE_PAYMENT_EXISTS` (409) — 检测到历史未完成支付
+- `INSUFFICIENT_BALANCE` (422) — 余额不足
+- `NO_PLATFORM_ADDRESS` (503) — 平台地址池枯竭
+- `STATE_MISMATCH` (409) — 支付状态不匹配（非 prepare）
+- `CHAIN_ERROR` (502) — 链上/外部服务错误
+- `VALIDATION_ERROR` (400) — 请求参数校验失败
+- `INTERNAL_ERROR` (500) — 内部未知错误
+
 ## 接口测试
 
 1. 检查健康状态
