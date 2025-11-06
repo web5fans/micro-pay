@@ -140,3 +140,54 @@
 - 错误码与 HTTP 状态码已在 API 层统一映射，前端可依据 `code` 执行差异化提示与重试策略。
 - 当出现 409 并发类错误（如 `DUPLICATE_ACTIVE_PAYMENT` 或 `STATE_MISMATCH`），建议前端提示用户稍后重试或刷新数据状态。
 - 后续将考虑在响应中引入 `requestId` 以便更好地进行问题定位与链路追踪。
+
+## 查询接口（GET）
+
+### GET `/api/payment/:id`
+
+- 校验：`id` 必须为正整数，否则返回 `400 + VALIDATION_ERROR`。
+- 成功响应：
+
+```json
+{
+  "payment": { /* 去除 platform_address_index 字段 */ },
+  "accounts": [ /* 每条记录去除 platform_address_indexes 字段 */ ]
+}
+```
+
+- 404 未找到：
+
+```json
+{ "error": "Payment not found", "code": "NOT_FOUND" }
+```
+
+### GET `/api/payment/sender/:address?limit=20&offset=0`
+
+- 校验：
+  - `address` 必须为字符串；
+  - `limit` 范围 1–100；
+  - `offset` ≥ 0；
+  - 任一不满足返回 `400 + VALIDATION_ERROR`。
+- 成功响应：
+
+```json
+{
+  "items": [
+    { /* payment 去除 platform_address_index 字段 */ }
+  ],
+  "pagination": { "limit": 20, "offset": 0, "count": 1 }
+}
+```
+
+### GET `/api/payment/receiver/:address?limit=20&offset=0`
+
+- 校验同上；成功响应：
+
+```json
+{
+  "items": [
+    { /* account 去除 platform_address_indexes 字段 */ }
+  ],
+  "pagination": { "limit": 20, "offset": 0, "count": 1 }
+}
+```

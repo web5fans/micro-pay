@@ -1,7 +1,7 @@
 import express, { Request, Response } from 'express';
 import { preparePayment, completeTransfer } from '../services/paymentService';
-import { getPaymentById, getPaymentsBySender } from '../models/payment';
-import { getAccountsByPaymentId, getAccountsByReceiver } from '../models/account';
+import { getPaymentById, getPaymentsBySenderPaged } from '../models/payment';
+import { getAccountsByPaymentId, getAccountsByReceiver, getAccountsByReceiverPaged } from '../models/account';
 import { ErrorCode } from './errorCodes';
 
 export const paymentRouter = express.Router();
@@ -94,12 +94,15 @@ paymentRouter.post('/transfer', async (req: Request, res: Response) => {
 // Query payment record by payment id
 paymentRouter.get('/:id', async (req: Request, res: Response) => {
   try {
-    const paymentId = parseInt(req.params.id);
+    const paymentId = Number.parseInt(req.params.id);
+    if (!Number.isFinite(paymentId) || paymentId <= 0) {
+      return res.status(400).json({ error: 'Invalid payment id', code: ErrorCode.VALIDATION_ERROR });
+    }
     
     // Get payment record
     const payment = await getPaymentById(paymentId);
     if (!payment) {
-      return res.status(404).json({ error: 'Payment not found' });
+      return res.status(404).json({ error: 'Payment not found', code: ErrorCode.NOT_FOUND });
     }
     
     // Get split account records
@@ -128,9 +131,20 @@ paymentRouter.get('/:id', async (req: Request, res: Response) => {
 paymentRouter.get('/sender/:address', async (req: Request, res: Response) => {
   try {
     const address = req.params.address;
+    const limit = Number.parseInt(String(req.query.limit ?? '20'));
+    const offset = Number.parseInt(String(req.query.offset ?? '0'));
+    if (!address || typeof address !== 'string') {
+      return res.status(400).json({ error: 'Invalid address', code: ErrorCode.VALIDATION_ERROR });
+    }
+    if (!Number.isFinite(limit) || limit <= 0 || limit > 100) {
+      return res.status(400).json({ error: 'Invalid limit (1-100)', code: ErrorCode.VALIDATION_ERROR });
+    }
+    if (!Number.isFinite(offset) || offset < 0) {
+      return res.status(400).json({ error: 'Invalid offset (>=0)', code: ErrorCode.VALIDATION_ERROR });
+    }
     
-    // Get payment records
-    const payments = await getPaymentsBySender(address);
+    // Get payment records paged
+    const payments = await getPaymentsBySenderPaged(address, limit, offset);
     
     // Remove platform_address_index field from each payment record
     const paymentsWithoutIndex = payments.map(payment => {
@@ -138,10 +152,11 @@ paymentRouter.get('/sender/:address', async (req: Request, res: Response) => {
       return paymentWithoutIndex;
     });
     
-    res.json(paymentsWithoutIndex);
+    res.json({ items: paymentsWithoutIndex, pagination: { limit, offset, count: paymentsWithoutIndex.length } });
   } catch (error) {
     console.error('Error in get payments by sender endpoint:', error);
-    res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: message, code: ErrorCode.INTERNAL_ERROR });
   }
 });
 
@@ -149,9 +164,20 @@ paymentRouter.get('/sender/:address', async (req: Request, res: Response) => {
 paymentRouter.get('/receiver/:address', async (req: Request, res: Response) => {
   try {
     const address = req.params.address;
+    const limit = Number.parseInt(String(req.query.limit ?? '20'));
+    const offset = Number.parseInt(String(req.query.offset ?? '0'));
+    if (!address || typeof address !== 'string') {
+      return res.status(400).json({ error: 'Invalid address', code: ErrorCode.VALIDATION_ERROR });
+    }
+    if (!Number.isFinite(limit) || limit <= 0 || limit > 100) {
+      return res.status(400).json({ error: 'Invalid limit (1-100)', code: ErrorCode.VALIDATION_ERROR });
+    }
+    if (!Number.isFinite(offset) || offset < 0) {
+      return res.status(400).json({ error: 'Invalid offset (>=0)', code: ErrorCode.VALIDATION_ERROR });
+    }
     
-    // Get account records
-    const accounts = await getAccountsByReceiver(address);
+    // Get account records paged
+    const accounts = await getAccountsByReceiverPaged(address, limit, offset);
     
     // Remove platform_address_indexes field from each account record
     const accountsWithoutIndex = accounts.map(account => {
@@ -159,9 +185,10 @@ paymentRouter.get('/receiver/:address', async (req: Request, res: Response) => {
       return accountWithoutIndex;
     });
     
-    res.json(accountsWithoutIndex);
+    res.json({ items: accountsWithoutIndex, pagination: { limit, offset, count: accountsWithoutIndex.length } });
   } catch (error) {
     console.error('Error in get accounts by receiver endpoint:', error);
-    res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: message, code: ErrorCode.INTERNAL_ERROR });
   }
 });

@@ -160,3 +160,14 @@ export async function getAccountsByReceiver(receiver: string): Promise<Account[]
   
   return result.rows;
 }
+
+export async function getAccountsByReceiverPaged(receiver: string, limit: number, offset: number): Promise<Account[]> {
+  const result = await query(
+    `SELECT * FROM account 
+     WHERE receiver = $1 
+     ORDER BY created_at DESC 
+     LIMIT $2 OFFSET $3`,
+    [receiver, limit, offset]
+  );
+  return result.rows;
+}

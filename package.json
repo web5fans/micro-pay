@@ -19,7 +19,7 @@
   "license": "ISC",
   "dependencies": {
     "@ckb-ccc/core": "^1.12.2",
-    "dotenv": "^16.3.1",
+    "dotenv": "^17.2.3",
     "express": "^5.1.0",
     "pg": "^8.16.3",
     "@scure/bip32": "^2.0.1",

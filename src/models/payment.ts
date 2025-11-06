@@ -117,6 +117,17 @@ export async function getPaymentsBySender(sender: string): Promise<Payment[]> {
   return result.rows;
 }
 
+export async function getPaymentsBySenderPaged(sender: string, limit: number, offset: number): Promise<Payment[]> {
+  const result = await query(
+    `SELECT * FROM payment 
+     WHERE sender = $1 
+     ORDER BY created_at DESC 
+     LIMIT $2 OFFSET $3`,
+    [sender, limit, offset]
+  );
+  return result.rows;
+}
+
 export async function getUncompletedPaymentsBySender(sender: string): Promise<Payment[]> {
   const result = await query(
     `SELECT * FROM payment WHERE sender = $1 AND (status = 0 OR status = 1) ORDER BY created_at DESC`,
