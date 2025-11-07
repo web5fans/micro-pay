@@ -1,7 +1,7 @@
 import express, { Request, Response } from 'express';
 import { preparePayment, completeTransfer } from '../services/paymentService';
-import { getPaymentById, getPaymentsBySenderPaged } from '../models/payment';
-import { getAccountsByPaymentId, getAccountsByReceiver, getAccountsByReceiverPaged } from '../models/account';
+import { getPaymentById, getPaymentsBySenderPaged, countPaymentsByDid, getPaymentsByDidSorted } from '../models/payment';
+import { getAccountsByPaymentId, getAccountsByReceiverPaged, countAccountsByDid, getAccountsByDidSorted } from '../models/account';
 import { ErrorCode } from './errorCodes';
 
 export const paymentRouter = express.Router();
@@ -10,7 +10,7 @@ export const paymentRouter = express.Router();
 paymentRouter.post('/prepare', async (req: Request, res: Response) => {
   try {
     console.log('prepare Request body:', req.body);
-    const { sender, receiver, amount, splitReceivers, info } = req.body;
+    const { sender, receiver, amount, splitReceivers, info, senderDid, receiverDid } = req.body;
     
     // Validate request parameters
     if (!sender || typeof sender !== 'string' || !receiver || typeof receiver !== 'string') {
@@ -36,7 +36,7 @@ paymentRouter.post('/prepare', async (req: Request, res: Response) => {
     }
     
     // Prepare payment
-    const result = await preparePayment(sender, receiver, amount, splitReceivers, info);
+    const result = await preparePayment(sender, receiver, amount, splitReceivers, info, senderDid ?? null, receiverDid ?? null);
     
     res.json(result);
   } catch (error) {
@@ -91,6 +91,76 @@ paymentRouter.post('/transfer', async (req: Request, res: Response) => {
     if (message.toLowerCase().includes('transaction') || message.toLowerCase().includes('send')) {
       return res.status(502).json({ error: message, code: ErrorCode.CHAIN_ERROR });
     }
+    res.status(500).json({ error: message, code: ErrorCode.INTERNAL_ERROR });
+  }
+});
+
+// Unified DID query endpoint
+paymentRouter.get('/did/:did', async (req: Request, res: Response) => {
+  try {
+    const { did } = req.params;
+    const { limit = '20', offset = '0' } = req.query as Record<string, string>;
+
+    // Basic validation
+    if (!did || typeof did !== 'string' || did.length > 200) {
+      return res.status(400).json({ error: 'Invalid DID', code: ErrorCode.VALIDATION_ERROR });
+    }
+    const limitNum = Number(limit);
+    const offsetNum = Number(offset);
+    if (!Number.isInteger(limitNum) || limitNum < 1 || limitNum > 100) {
+      return res.status(400).json({ error: 'Invalid limit (1-100)', code: ErrorCode.VALIDATION_ERROR });
+    }
+    if (!Number.isInteger(offsetNum) || offsetNum < 0) {
+      return res.status(400).json({ error: 'Invalid offset (>=0)', code: ErrorCode.VALIDATION_ERROR });
+    }
+
+    // Fetch enough results from each side, merge-sort by created_at desc, then paginate
+    const need = limitNum + offsetNum;
+    const [payments, accounts] = await Promise.all([
+      getPaymentsByDidSorted(did, need),
+      getAccountsByDidSorted(did, need)
+    ]);
+
+    let i = 0, j = 0;
+    const merged: Array<{ type: 'payment' | 'account'; id: number; sender: string | null; receiver: string | null; amount: number; info: string | null; status: number; tx_hash: string | null; created_at: Date }> = [];
+    while ((i < payments.length || j < accounts.length) && merged.length < need) {
+      const p = i < payments.length ? payments[i] : null;
+      const a = j < accounts.length ? accounts[j] : null;
+      if (p && (!a || p.created_at >= (a as any).created_at)) {
+        merged.push({ type: 'payment', id: p.id, sender: p.sender, receiver: null, amount: p.amount, info: p.info, status: p.status, tx_hash: p.tx_hash, created_at: p.created_at });
+        i++;
+      } else if (a) {
+        merged.push({ type: 'account', id: a.id, sender: null, receiver: a.receiver, amount: a.amount, info: a.info, status: a.status, tx_hash: a.tx_hash, created_at: a.created_at });
+        j++;
+      } else {
+        break;
+      }
+    }
+
+    const sliced = merged.slice(offsetNum, offsetNum + limitNum);
+    const [paymentCount, accountCount] = await Promise.all([
+      countPaymentsByDid(did),
+      countAccountsByDid(did)
+    ]);
+    const count = paymentCount + accountCount;
+
+    res.json({
+      items: sliced.map((r) => ({
+        type: r.type,
+        id: r.id,
+        sender: r.sender ?? undefined,
+        receiver: r.receiver,
+        amount: r.amount,
+        info: r.info,
+        status: r.status,
+        txHash: r.tx_hash,
+        createdAt: r.created_at,
+      })),
+      pagination: { limit: limitNum, offset: offsetNum, count }
+    });
+  } catch (error) {
+    console.error('Error in DID query endpoint:', error);
+    const message = error instanceof Error ? error.message : 'Unknown error';
     res.status(500).json({ error: message, code: ErrorCode.INTERNAL_ERROR });
   }
 });

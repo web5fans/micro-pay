@@ -280,3 +280,42 @@ curl -s -X POST http://localhost:3000/api/payment/transfer \
     }
 }
 ```
+
+### GET `/api/payment/did/:did?limit=20&offset=0`
+
+- 描述：按 DID 统一查询，同时聚合 `payment` 与 `account` 两侧与该 DID 相关的记录，便于同一 DID 绑定多个地址时统一检索。
+- 查询参数：
+  - `limit`（可选，整数，默认 `20`）：范围 `1..100`；
+  - `offset`（可选，整数，默认 `0`）：`>= 0`。
+- 校验：
+  - `did` 必须为非空字符串，长度不超过 200；
+  - 非法 `limit`/`offset` 返回 `400 + VALIDATION_ERROR`。
+- 响应结构：
+
+```json
+{
+  "items": [
+    {
+      "type": "payment", // 或 "account"
+      "id": 123,
+      "sender": "ckb1...", // 仅当 type=payment 时存在
+      "receiver": "ckb1...", // 仅当 type=account 时存在
+      "amount": 1000,
+      "info": "optional info",
+      "status": 0,
+      "txHash": "0x...",
+      "createdAt": "2025-01-01T00:00:00.000Z"
+    }
+  ],
+  "pagination": {
+    "limit": 20,
+    "offset": 0,
+    "count": 42
+  }
+}
+```
+
+说明：
+- `payment` 侧包含 `sender_did = did` 的记录；
+- `account` 侧包含 `receiver_did = did` 的记录；
+- 结果按 `created_at` 倒序；

@@ -5,6 +5,7 @@ export interface Account {
   id: number;
   payment_id: number;
   receiver: string;
+  receiver_did?: string | null;
   platform_address_indexes: string;
   amount: number;
   info: string | null;
@@ -21,13 +22,14 @@ export async function createAccountWithTransaction(
   receiver: string,
   amount: number,
   info: string | null = null,
-  platform_address_indexes: string = ''
+  platform_address_indexes: string = '',
+  receiver_did: string | null = null
 ) {
   const result = await client.query(
-    `INSERT INTO account (payment_id, receiver, platform_address_indexes, amount, info, status)
-     VALUES ($1, $2, $3, $4, $5, 0)
+    `INSERT INTO account (payment_id, receiver, platform_address_indexes, amount, info, status, receiver_did)
+     VALUES ($1, $2, $3, $4, $5, 0, $6)
      RETURNING *`,
-    [payment_id, receiver, platform_address_indexes, amount, info]
+    [payment_id, receiver, platform_address_indexes, amount, info, receiver_did]
   );
   
   return result.rows[0];
@@ -170,6 +172,26 @@ export async function getAccountsByReceiverPaged(receiver: string, limit: number
      ORDER BY created_at DESC 
      LIMIT $2 OFFSET $3`,
     [receiver, limit, offset]
+  );
+  return result.rows;
+}
+
+// DID helpers: account side
+export async function countAccountsByDid(did: string): Promise<number> {
+  const result = await query(
+    `SELECT COUNT(*) AS total FROM account WHERE receiver_did = $1`,
+    [did]
+  );
+  return parseInt(result.rows[0]?.total ?? '0', 10);
+}
+
+export async function getAccountsByDidSorted(did: string, limit: number): Promise<Account[]> {
+  const result = await query(
+    `SELECT * FROM account 
+     WHERE receiver_did = $1 
+     ORDER BY created_at DESC 
+     LIMIT $2`,
+    [did, limit]
   );
   return result.rows;
 }

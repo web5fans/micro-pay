@@ -16,7 +16,9 @@ export async function preparePayment(
   receiverAddress: string,
   amount: number,
   splitReceivers: SplitReceiver[] = [],
-  info: string | null = null
+  info: string | null = null,
+  senderDid: string | null = null,
+  receiverDid: string | null = null
 ) {
   // Check if sender address has enough balance
   const senderBalance = await getAddressBalance(senderAddress);
@@ -60,13 +62,15 @@ export async function preparePayment(
         platformAddressRecord.index,
         amount,
         info,
-        txHash
+        txHash,
+        senderDid,
+        receiverDid
       );
 
       // Create split receiver account records
       for (const splitReceiver of splitReceivers) {
         const splitAmount = Math.floor(amount * splitReceiver.splitRate / 100);
-        await createAccountWithTransaction(client, payment.id, splitReceiver.address, splitAmount, info);
+        await createAccountWithTransaction(client, payment.id, splitReceiver.address, splitAmount, info, '', receiverDid);
       }
 
       // Create receiver account record
@@ -75,7 +79,9 @@ export async function preparePayment(
         payment.id, 
         receiverAddress, 
         Math.floor(amount * receiverSplitRate / 100),
-        info
+        info,
+        '',
+        receiverDid
       );
 
       return {

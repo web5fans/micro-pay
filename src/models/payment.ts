@@ -5,6 +5,8 @@ export interface Payment {
   id: number;
   sender: string;
   receiver: string;
+  sender_did?: string | null;
+  receiver_did?: string | null;
   platform_address_index: number;
   amount: number;
   info: string | null;
@@ -22,13 +24,15 @@ export async function createPaymentWithTransaction(
   platform_address_index: number,
   amount: number,
   info: string | null = null,
-  tx_hash: string | null = null
+  tx_hash: string | null = null,
+  sender_did: string | null = null,
+  receiver_did: string | null = null
 ) {
   const result = await client.query(
-    `INSERT INTO payment (sender, receiver, platform_address_index, amount, info, status, tx_hash)
-     VALUES ($1, $2, $3, $4, $5, 0, $6)
+    `INSERT INTO payment (sender, receiver, platform_address_index, amount, info, status, tx_hash, sender_did, receiver_did)
+     VALUES ($1, $2, $3, $4, $5, 0, $6, $7, $8)
      RETURNING *`,
-    [sender, receiver, platform_address_index, amount, info, tx_hash]
+    [sender, receiver, platform_address_index, amount, info, tx_hash, sender_did, receiver_did]
   );
   
   return result.rows[0];
@@ -155,5 +159,25 @@ export async function getTransferPayments(): Promise<Payment[]> {
     []
   );
   
+  return result.rows;
+}
+
+// DID helpers: payment side
+export async function countPaymentsByDid(did: string): Promise<number> {
+  const result = await query(
+    `SELECT COUNT(*) AS total FROM payment WHERE sender_did = $1`,
+    [did]
+  );
+  return parseInt(result.rows[0]?.total ?? '0', 10);
+}
+
+export async function getPaymentsByDidSorted(did: string, limit: number): Promise<Payment[]> {
+  const result = await query(
+    `SELECT * FROM payment 
+     WHERE sender_did = $1 
+     ORDER BY created_at DESC 
+     LIMIT $2`,
+    [did, limit]
+  );
   return result.rows;
 }

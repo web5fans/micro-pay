@@ -79,7 +79,9 @@ CREATE TABLE IF NOT EXISTS platform_address(
 CREATE TABLE IF NOT EXISTS payment(
     id BIGINT PRIMARY KEY,
     sender TEXT,
+    sender_did TEXT,
     receiver TEXT,
+    receiver_did TEXT,
     platform_address_index INTEGER,
     amount BIGINT,
     info TEXT,
@@ -101,6 +103,7 @@ CREATE TABLE IF NOT EXISTS account(
     id BIGINT PRIMARY KEY,
     payment_id BIGINT,
     receiver TEXT,
+    receiver_did TEXT,
     platform_address_indexes TEXT,
     amount BIGINT,
     info TEXT,

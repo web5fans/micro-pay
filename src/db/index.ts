@@ -41,6 +41,8 @@ export async function initDb() {
         id SERIAL PRIMARY KEY,
         sender TEXT NOT NULL,
         receiver TEXT NOT NULL,
+        sender_did TEXT,
+        receiver_did TEXT,
         platform_address_index INTEGER NOT NULL,
         amount BIGINT NOT NULL,
         info TEXT,
@@ -57,6 +59,7 @@ export async function initDb() {
         id SERIAL PRIMARY KEY,
         payment_id INTEGER NOT NULL REFERENCES payment(id),
         receiver TEXT NOT NULL,
+        receiver_did TEXT,
         platform_address_indexes TEXT DEFAULT '',
         amount BIGINT NOT NULL,
         info TEXT,
@@ -92,6 +95,20 @@ export async function initDb() {
     await query(
       `CREATE UNIQUE INDEX IF NOT EXISTS ux_platform_address_index
        ON platform_address(index)`,
+      []
+    );
+
+    // Indexes for DID lookups
+    await query(
+      `CREATE INDEX IF NOT EXISTS ix_payment_sender_did ON payment(sender_did)`,
+      []
+    );
+    await query(
+      `CREATE INDEX IF NOT EXISTS ix_payment_receiver_did ON payment(receiver_did)`,
+      []
+    );
+    await query(
+      `CREATE INDEX IF NOT EXISTS ix_account_receiver_did ON account(receiver_did)`,
       []
     );
     
