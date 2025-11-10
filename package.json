@@ -9,7 +9,9 @@
     "serve": "node dist/index.js",
     "test:platform-address": "ts-node tests/platformAddress.concurrency.test.ts",
     "test:payment": "ts-node tests/payment.concurrency.test.ts",
-    "test:account": "ts-node tests/account.concurrency.test.ts"
+    "test:account": "ts-node tests/account.concurrency.test.ts",
+    "integration:payment": "ts-node integration/payment_test.ts",
+    "integration:account": "ts-node integration/account_test.ts"
   },
   "keywords": [
     "ckb",
