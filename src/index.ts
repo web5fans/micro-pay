@@ -6,9 +6,13 @@ import { initPlatformAddresses } from './services/ckbService';
 import { startPaymentCleanupTask } from './services/paymentCleanupService';
 import { startCkbTransactionCheckTask } from './services/ckbTransactionCheckService';
 import { startAccountCheckTask } from './services/accountService';
+import { initLogger } from './utils/logger';
 
 // Load environment variables
 dotenv.config();
+
+// Init logger (time-prefixed console output)
+initLogger();
 
 // Create Express application
 const app = express();
