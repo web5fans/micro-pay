@@ -10,6 +10,9 @@ dotenv.config();
 
 // Platform configuration
 export const MIN_WITHDRAWAL_AMOUNT = BigInt(65 * 10**8); // 65 CKB in shannons
+// Transfer fee in shannons
+export const TRANSFER_FEE = process.env.TRANSFER_FEE ? BigInt(process.env.TRANSFER_FEE) : BigInt(10000);
+
 // Provide a default test mnemonic for development environment
 const PLATFORM_MNEMONIC = process.env.PLATFORM_MNEMONIC || 'calm gown solid jaguar card web paper loan scale sister rebel syrup';
 const CKB_NODE_URL = process.env.CKB_NODE_URL || 'https://testnet.ckb.dev/rpc';
@@ -176,7 +179,7 @@ export async function build2to2Transaction(
     }
 
     // fixed fee
-    const fee = BigInt(10000);
+    const fee = TRANSFER_FEE;
     const outputs = [
       {
         capacity: `${platformSum + amount}`,
@@ -298,16 +301,16 @@ export async function AccountingTransaction(
       });
     }
 
-    // fixed fee
-    const fee = BigInt(20000);
     // append receiver output
     outputs.push({
-      capacity: totalAccountingAmount - fee,
+      capacity: totalAccountingAmount,
       lock: receiverScript,
     });
 
     // deal change
-    const change = platformAmount - totalAccountingAmount;
+    const fee = TRANSFER_FEE;
+    // platform provide fee
+    const change = platformAmount - totalAccountingAmount - fee;
     outputs[0].capacity += change;
 
     let tx = Transaction.from({

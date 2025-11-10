@@ -55,7 +55,7 @@ Path: m/44'/309'/0'/0/8, Address: ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0v
 Path: m/44'/309'/0'/0/9, Address: ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqdczyxt5nz6d2s95vel3msrntd8hslxucgx2czac
 ```
 
-每个地址上只有一个 live cell，初始该 cell 的金额为 min_withdrawal_amount 。
+每个地址上只有一个 live cell，初始该 cell 的金额为 min_withdrawal_amount（65 CKB） + 5 CKB （准备的手续费） 。
 
 每个请求来了之后，从多个地址中挑选一个使用，并进行标记，防止重复使用。
 

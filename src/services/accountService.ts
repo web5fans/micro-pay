@@ -1,7 +1,7 @@
 import { getPaymentCompleteAccounts, updateAccountStatusFromCompleteToAccountingWithTransaction, updateTxHashAndPlatformAddressesIndexesForAccountingAccountWithTransaction } from '../models/account';
 import { getAvailablePlatformAddressWithTransaction } from '../models/platformAddress';
 import { withTransaction } from '../db';
-import { AccountingTransaction, getAddressBalance, MIN_WITHDRAWAL_AMOUNT, sendCkbTransaction } from './ckbService';
+import { AccountingTransaction, getAddressBalance, MIN_WITHDRAWAL_AMOUNT, sendCkbTransaction, TRANSFER_FEE } from './ckbService';
 
 export async function accountCheck(): Promise<void> {
   try {
@@ -43,7 +43,7 @@ export async function accountCheck(): Promise<void> {
             platformAddressesIndexes.push(platformAddress.index);
             const balance = await getAddressBalance(platformAddress.address);
             platformAmount += balance - MIN_WITHDRAWAL_AMOUNT;
-            if (platformAmount >= BigInt(account.total_amount)) {
+            if (platformAmount >= BigInt(account.total_amount) + TRANSFER_FEE) {
               break;
             }
           }
