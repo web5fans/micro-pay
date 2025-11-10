@@ -1,6 +1,6 @@
-import { createPaymentWithTransaction, getUncompletedPaymentsBySender, updatePaymentStatusFromPrepareToTransfer, updatePaymentStatusFromTransferToPrepare } from '../models/payment';
-import { createAccountWithTransaction } from '../models/account';
-import { getAvailablePlatformAddressWithTransaction } from '../models/platformAddress';
+import { createPaymentWithTransaction, getTransferPaymentsBySender, getTransferPaymentsBySenderDid, updatePaymentFromPrepareToCancelBySenderDidWithTransaction, updatePaymentFromPrepareToCancelBySenderWithTransaction, updatePaymentFromPrepareToCancelWithTransaction, updatePaymentStatusFromPrepareToTransfer, updatePaymentStatusFromTransferToPrepare } from '../models/payment';
+import { createAccountWithTransaction, updateAccountStatusFromPrepareToCancelWithTransaction } from '../models/account';
+import { getAvailablePlatformAddressWithTransaction, releasePlatformAddressWithTransaction } from '../models/platformAddress';
 import { build2to2Transaction, completeTransaction, getAddressBalance, MIN_WITHDRAWAL_AMOUNT } from './ckbService';
 import { withTransaction } from '../db';
 
@@ -26,15 +26,46 @@ export async function preparePayment(
     throw new Error('Sender does not have enough balance');
   }
 
-  // If sender has incomplete payments, return error
-  const existingPayment = await getUncompletedPaymentsBySender(senderAddress);
+  // If sender has transfer payments, return error
+  const existingPayment = await getTransferPaymentsBySender(senderAddress);
   if (existingPayment.length > 0) {
     throw new Error('Sender has an incomplete payment');
+  }
+
+  // check by sender_did too
+  if (senderDid) {
+    // If sender has transfer payments, return error
+    const existingPayment = await getTransferPaymentsBySenderDid(senderDid);
+    if (existingPayment.length > 0) {
+      throw new Error('Sender has an incomplete payment');
+    }
   }
 
   try {
     // Use transaction to ensure DB operations atomicity including address allocation
     const result = await withTransaction(async (client) => {
+      // clean up existing prepare payments
+      const cancelledPayments = await updatePaymentFromPrepareToCancelBySenderWithTransaction(client, senderAddress);
+      for (const payment of cancelledPayments) {
+        console.log(`Cancelled prepare payment ${payment.id} for sender ${senderAddress}`);
+        // Release platform address
+        await releasePlatformAddressWithTransaction(client, payment.platform_address_index);
+        // update account status to cancel
+        await updateAccountStatusFromPrepareToCancelWithTransaction(client, payment.id);
+      }
+
+      // clean up existing prepare payments by sender_did too
+      if (senderDid) {
+        const cancelledPayments = await updatePaymentFromPrepareToCancelBySenderDidWithTransaction(client, senderDid);
+        for (const payment of cancelledPayments) {
+          console.log(`Cancelled prepare payment ${payment.id} for sender ${senderDid}`);
+          // Release platform address
+          await releasePlatformAddressWithTransaction(client, payment.platform_address_index);
+          // update account status to cancel
+          await updateAccountStatusFromPrepareToCancelWithTransaction(client, payment.id);
+        }
+      }
+
       // Get available platform address within transaction (will rollback on error)
       const platformAddressRecord = await getAvailablePlatformAddressWithTransaction(client);
       if (!platformAddressRecord) {

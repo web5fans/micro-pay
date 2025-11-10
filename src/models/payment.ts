@@ -89,6 +89,36 @@ export async function updatePaymentFromPrepareToCancelWithTransaction(
   return result.rows[0] || null;
 }
 
+
+export async function updatePaymentFromPrepareToCancelBySenderWithTransaction(
+  client: PoolClient,
+  sender: string
+) : Promise<Payment[]> {
+  const result = await client.query(
+    `UPDATE payment
+     SET status = 3, updated_at = NOW()
+     WHERE sender = $1 AND status = 0
+     RETURNING *`,
+    [sender] 
+  );
+  return result.rows;
+}
+
+export async function updatePaymentFromPrepareToCancelBySenderDidWithTransaction(
+  client: PoolClient,
+  sender_did: string
+) : Promise<Payment[]> {
+  const result = await client.query(
+    `UPDATE payment
+     SET status = 3, updated_at = NOW()
+     WHERE sender_did = $1 AND status = 0
+     RETURNING *`,
+    [sender_did] 
+  );
+  return result.rows;
+}
+
+
 export async function updatePaymentStatusFromTransferToCancelWithTransaction(
   client: PoolClient,
   id: number
@@ -132,10 +162,19 @@ export async function getPaymentsBySenderPaged(sender: string, limit: number, of
   return result.rows;
 }
 
-export async function getUncompletedPaymentsBySender(sender: string): Promise<Payment[]> {
+export async function getTransferPaymentsBySender(sender: string): Promise<Payment[]> {
   const result = await query(
-    `SELECT * FROM payment WHERE sender = $1 AND (status = 0 OR status = 1) ORDER BY created_at DESC`,
+    `SELECT * FROM payment WHERE sender = $1 AND status = 1 ORDER BY created_at DESC`,
     [sender]
+  );
+  
+  return result.rows;
+}
+
+export async function getTransferPaymentsBySenderDid(sender_did: string): Promise<Payment[]> {
+  const result = await query(
+    `SELECT * FROM payment WHERE sender_did = $1 AND status = 1 ORDER BY created_at DESC`,
+    [sender_did]
   );
   
   return result.rows;
