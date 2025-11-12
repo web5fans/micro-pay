@@ -194,6 +194,41 @@ export async function getTransferPayments(): Promise<Payment[]> {
   return result.rows;
 }
 
+// Sum of completed payments by info
+export async function sumCompletedPaymentsByInfo(info: string): Promise<number> {
+  const result = await query(
+    `SELECT COALESCE(SUM(amount), 0) AS total FROM payment WHERE status = 2 AND info = $1`,
+    [info]
+  );
+  const total = result.rows[0]?.total;
+  return typeof total === 'string' ? parseInt(total, 10) : (total ?? 0);
+}
+
+// Completed payments by info (paged)
+export async function getCompletedPaymentsByInfoPaged(
+  info: string,
+  limit: number,
+  offset: number
+): Promise<Payment[]> {
+  const result = await query(
+    `SELECT * FROM payment 
+     WHERE status = 2 AND info = $1 
+     ORDER BY created_at DESC 
+     LIMIT $2 OFFSET $3`,
+    [info, limit, offset]
+  );
+  return result.rows;
+}
+
+// Count completed payments by info
+export async function countCompletedPaymentsByInfo(info: string): Promise<number> {
+  const result = await query(
+    `SELECT COUNT(*) AS total FROM payment WHERE status = 2 AND info = $1`,
+    [info]
+  );
+  return parseInt(result.rows[0]?.total ?? '0', 10);
+}
+
 // Filtered queries: by sender_did with optional time range and category, with pagination
 export async function countPaymentsBySenderDidFiltered(
   did: string,

@@ -172,7 +172,7 @@ curl -s -X POST http://localhost:3000/api/payment/transfer \
 
 ## 查询接口（GET）
 
-### GET `/api/payment/:id`
+### GET `/api/payment/id/:id`
 
 - 校验：`id` 必须为正整数，否则返回 `400 + VALIDATION_ERROR`。
 - 成功响应：
@@ -376,5 +376,61 @@ curl -s -X POST http://localhost:3000/api/payment/transfer \
     }
   ],
   "pagination": { "limit": 20, "offset": 0, "count": 17 }
+}
+```
+### GET /api/payment/completed-total
+- 描述：根据 `info` 查询已完成（status=2）支付记录的总金额。
+- Query 参数：
+  - `info`（必填）：文本标识，长度建议 ≤ 2000
+- 响应：
+```json
+{
+  "info": "post_id",
+  "total": 10000000000
+}
+```
+
+### GET /api/payment/completed
+- 描述：根据 `info` 查询已完成（status=2）支付记录（分页）。
+- Query 参数：
+  - `info`（必填）：文本标识，长度建议 ≤ 2000
+  - `limit`（可选）：每页条数，默认 `20`，范围 `1..100`
+  - `offset`（可选）：偏移量，默认 `0`，`>=0`
+- 响应：
+```json
+{
+  "items": [
+    {
+      "id": 4,
+      "sender": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqwu8lmjcalepgp5k6d4j0mtxwww68v9m6qz0q8ah",
+      "senderDid": "did:ckb:sender",
+      "receiver": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqttz30qvq8rlht9r9wc6lqu27x6ykx5eyskhysra",
+      "receiverDid": "did:ckb:receiver",
+      "amount": "5000000000",
+      "info": "post_id",
+      "status": 2,
+      "txHash": "0x56ccbeadef0646a158d1a416690f05cb412c611488d87d36c8f8a012d021d9c0",
+      "category": 0,
+      "createdAt": "2025-11-11T23:09:39.913Z"
+    },
+    {
+      "id": 2,
+      "sender": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqwu8lmjcalepgp5k6d4j0mtxwww68v9m6qz0q8ah",
+      "senderDid": "did:ckb:sender",
+      "receiver": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqttz30qvq8rlht9r9wc6lqu27x6ykx5eyskhysra",
+      "receiverDid": "did:ckb:receiver",
+      "amount": "5000000000",
+      "info": "post_id",
+      "status": 2,
+      "txHash": "0x731bb11011789f133d6989ad3e54ef2ccb05720947013f37d88d5c693274532c",
+      "category": 0,
+      "createdAt": "2025-11-11T23:07:59.197Z"
+    }
+  ],
+  "pagination": {
+    "limit": 20,
+    "offset": 0,
+    "count": 2
+  }
 }
 ```

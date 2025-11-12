@@ -1,6 +1,6 @@
 import express, { Request, Response } from 'express';
 import { preparePayment, completeTransfer } from '../services/paymentService';
-import { getPaymentById, getPaymentsBySenderPaged, countPaymentsBySenderDidFiltered, getPaymentsBySenderDidFiltered } from '../models/payment';
+import { getPaymentById, getPaymentsBySenderPaged, countPaymentsBySenderDidFiltered, getPaymentsBySenderDidFiltered, sumCompletedPaymentsByInfo, getCompletedPaymentsByInfoPaged, countCompletedPaymentsByInfo } from '../models/payment';
 import { getAccountsByPaymentId, getAccountsByReceiverPaged, countAccountsByReceiverDidFiltered, getAccountsByReceiverDidFiltered } from '../models/account';
 import { ErrorCode } from './errorCodes';
 
@@ -100,8 +100,8 @@ paymentRouter.post('/transfer', async (req: Request, res: Response) => {
   }
 });
 
-// Query payment record by payment id
-paymentRouter.get('/:id', async (req: Request, res: Response) => {
+// Query payment record by payment id (only numeric ids)
+paymentRouter.get('/id/:id', async (req: Request, res: Response) => {
   try {
     const paymentId = Number.parseInt(req.params.id);
     if (!Number.isFinite(paymentId) || paymentId <= 0) {
@@ -354,6 +354,64 @@ paymentRouter.get('/receiver-did/:did', async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error('Error in receiver DID query endpoint:', error);
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: message, code: ErrorCode.INTERNAL_ERROR });
+  }
+});
+
+// Completed payments total by info (query param)
+paymentRouter.get('/completed-total', async (req: Request, res: Response) => {
+  try {
+    const { info } = req.query as Record<string, string>;
+    if (!info || typeof info !== 'string' || info.length > 2000) {
+      return res.status(400).json({ error: 'Invalid info', code: ErrorCode.VALIDATION_ERROR });
+    }
+    const total = await sumCompletedPaymentsByInfo(info);
+    res.json({ info, total });
+  } catch (error) {
+    console.error('Error in completed-total endpoint:', error);
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: message, code: ErrorCode.INTERNAL_ERROR });
+  }
+});
+
+// Completed payments by info (paged)
+paymentRouter.get('/completed', async (req: Request, res: Response) => {
+  try {
+    const { info, limit = '20', offset = '0' } = req.query as Record<string, string>;
+    if (!info || typeof info !== 'string' || info.length > 2000) {
+      return res.status(400).json({ error: 'Invalid info', code: ErrorCode.VALIDATION_ERROR });
+    }
+    const limitNum = Number(limit);
+    const offsetNum = Number(offset);
+    if (!Number.isInteger(limitNum) || limitNum < 1 || limitNum > 100) {
+      return res.status(400).json({ error: 'Invalid limit (1-100)', code: ErrorCode.VALIDATION_ERROR });
+    }
+    if (!Number.isInteger(offsetNum) || offsetNum < 0) {
+      return res.status(400).json({ error: 'Invalid offset (>=0)', code: ErrorCode.VALIDATION_ERROR });
+    }
+    const [items, count] = await Promise.all([
+      getCompletedPaymentsByInfoPaged(info, limitNum, offsetNum),
+      countCompletedPaymentsByInfo(info)
+    ]);
+    res.json({
+      items: items.map(p => ({
+        id: p.id,
+        sender: p.sender,
+        senderDid: p.sender_did ?? undefined,
+        receiver: p.receiver,
+        receiverDid: p.receiver_did ?? undefined,
+        amount: p.amount,
+        info: p.info ?? undefined,
+        status: p.status,
+        txHash: p.tx_hash ?? undefined,
+        category: p.category,
+        createdAt: p.created_at
+      })),
+      pagination: { limit: limitNum, offset: offsetNum, count }
+    });
+  } catch (error) {
+    console.error('Error in completed-by-info endpoint:', error);
     const message = error instanceof Error ? error.message : 'Unknown error';
     res.status(500).json({ error: message, code: ErrorCode.INTERNAL_ERROR });
   }

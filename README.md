@@ -140,10 +140,13 @@ CREATE TABLE IF NOT EXISTS account(
 查询交易记录接口包括：
 
 - 根据支付 id 查询支付记录，包含支付者地址，接收者地址，转账金额，info, 交易 hash，交易状态等以及分账记录等。
-- 根据发送者地址查询支付记录，包含支付 id，接收者地址，转账金额, info, 交易 hash，交易状态等。
-- 根据接收者地址查询分账记录，包含分账id，支付 id，接收者地址，金额, info, 交易 hash，是否支付等。
-- 根据发送者DID查询支付记录，包含支付 id，接收者地址，转账金额, info, 交易 hash，交易状态等。
-- 根据接收者DID查询分账记录，包含分账id，支付 id，接收者地址，金额, info, 交易 hash，是否支付等。
+- 根据发送者地址查询支付记录（分页），包含支付 id，接收者地址，转账金额, info, 交易 hash，交易状态等。
+- 根据接收者地址查询分账记录（分页），包含分账id，支付 id，接收者地址，金额, info, 交易 hash，是否支付等。
+- 根据发送者DID查询支付记录（分页），包含支付 id，接收者地址，转账金额, info, 交易 hash，交易状态等。
+- 根据接收者DID查询分账记录（分页），包含分账id，支付 id，接收者地址，金额, info, 交易 hash，是否支付等。
+- 根据info查询已经完成的支付记录（分页），包含支付 id，发送者地址，接收者地址，转账金额, info, 交易 hash，交易状态等。
+- 根据info查询已经完成的支付记录的总金额。
+
 
 ### 超时处理
 
@@ -244,7 +247,7 @@ curl -s -X POST http://localhost:3000/api/payment/transfer \
 
 4. 根据支付id查询支付记录
 ```
-curl -s -X GET http://localhost:3000/api/payment/1 | jq .
+curl -s -X GET http://localhost:3000/api/payment/id/1 | jq .
 ```
 响应
 ```
@@ -462,6 +465,61 @@ curl -s -G "http://localhost:3000/api/payment/receiver-did/did:ckb:receiver" --d
   ],
   "pagination": {
     "limit": 50,
+    "offset": 0,
+    "count": 2
+  }
+}
+```
+
+9. 根据info查询已完成（status=2）支付记录的总金额
+``` 
+curl -s "http://localhost:3000/api/payment/completed-total?info=post_id" | jq .
+```
+响应
+```
+{
+  "info": "post_id",
+  "total": 10000000000
+}
+```
+
+10. 根据info查询已完成（status=2）支付记录
+``` 
+curl -s "http://localhost:3000/api/payment/completed?info=post_id" | jq .
+```
+响应
+```
+{
+  "items": [
+    {
+      "id": 4,
+      "sender": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqwu8lmjcalepgp5k6d4j0mtxwww68v9m6qz0q8ah",
+      "senderDid": "did:ckb:sender",
+      "receiver": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqttz30qvq8rlht9r9wc6lqu27x6ykx5eyskhysra",
+      "receiverDid": "did:ckb:receiver",
+      "amount": "5000000000",
+      "info": "post_id",
+      "status": 2,
+      "txHash": "0x56ccbeadef0646a158d1a416690f05cb412c611488d87d36c8f8a012d021d9c0",
+      "category": 0,
+      "createdAt": "2025-11-11T23:09:39.913Z"
+    },
+    {
+      "id": 2,
+      "sender": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqwu8lmjcalepgp5k6d4j0mtxwww68v9m6qz0q8ah",
+      "senderDid": "did:ckb:sender",
+      "receiver": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqttz30qvq8rlht9r9wc6lqu27x6ykx5eyskhysra",
+      "receiverDid": "did:ckb:receiver",
+      "amount": "5000000000",
+      "info": "post_id",
+      "status": 2,
+      "txHash": "0x731bb11011789f133d6989ad3e54ef2ccb05720947013f37d88d5c693274532c",
+      "category": 0,
+      "createdAt": "2025-11-11T23:07:59.197Z"
+    }
+  ],
+  "pagination": {
+    "limit": 20,
     "offset": 0,
     "count": 2
   }
