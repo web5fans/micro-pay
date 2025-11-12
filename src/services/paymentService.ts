@@ -1,4 +1,4 @@
-import { createPaymentWithTransaction, getTransferPaymentsBySender, getTransferPaymentsBySenderDid, updatePaymentFromPrepareToCancelBySenderDidWithTransaction, updatePaymentFromPrepareToCancelBySenderWithTransaction, updatePaymentFromPrepareToCancelWithTransaction, updatePaymentStatusFromPrepareToTransfer, updatePaymentStatusFromTransferToPrepare } from '../models/payment';
+import { createPaymentWithTransaction, getTransferPaymentsBySender, getTransferPaymentsBySenderDid, updatePaymentFromPrepareToCancelBySenderDidWithTransaction, updatePaymentFromPrepareToCancelBySenderWithTransaction, updatePaymentStatusFromPrepareToTransfer, updatePaymentStatusFromTransferToPrepare } from '../models/payment';
 import { createAccountWithTransaction, updateAccountStatusFromPrepareToCancelWithTransaction } from '../models/account';
 import { getAvailablePlatformAddressWithTransaction, releasePlatformAddressWithTransaction } from '../models/platformAddress';
 import { build2to2Transaction, completeTransaction, getAddressBalance, MIN_WITHDRAWAL_AMOUNT } from './ckbService';
@@ -7,6 +7,7 @@ import { withTransaction } from '../db';
 // Split receiver interface
 interface SplitReceiver {
   address: string;
+  receiverDid: string | null;
   splitRate: number;
 }
 
@@ -18,7 +19,8 @@ export async function preparePayment(
   splitReceivers: SplitReceiver[] = [],
   info: string | null = null,
   senderDid: string | null = null,
-  receiverDid: string | null = null
+  receiverDid: string | null = null,
+  category: number = 0
 ) {
   // Check if sender address has enough balance
   const senderBalance = await getAddressBalance(senderAddress);
@@ -95,13 +97,14 @@ export async function preparePayment(
         info,
         txHash,
         senderDid,
-        receiverDid
+        receiverDid,
+        category
       );
 
       // Create split receiver account records
       for (const splitReceiver of splitReceivers) {
         const splitAmount = Math.floor(amount * splitReceiver.splitRate / 100);
-        await createAccountWithTransaction(client, payment.id, splitReceiver.address, splitAmount, info, '', receiverDid);
+        await createAccountWithTransaction(client, payment.id, splitReceiver.address, splitAmount, info, '', splitReceiver.receiverDid, category ?? 0);
       }
 
       // Create receiver account record
@@ -112,7 +115,8 @@ export async function preparePayment(
         Math.floor(amount * receiverSplitRate / 100),
         info,
         '',
-        receiverDid
+        receiverDid,
+        category ?? 0
       );
 
       return {

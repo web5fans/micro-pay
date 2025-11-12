@@ -11,7 +11,8 @@
     "test:payment": "ts-node tests/payment.concurrency.test.ts",
     "test:account": "ts-node tests/account.concurrency.test.ts",
     "integration:payment": "ts-node integration/payment_test.ts",
-    "integration:account": "ts-node integration/account_test.ts"
+    "integration:account": "ts-node integration/account_test.ts",
+    "check:unused": "ts-prune -p tsconfig.unused.json"
   },
   "keywords": [
     "ckb",
@@ -31,6 +32,7 @@
     "@types/express": "^5.0.5",
     "@types/node": "^24.9.2",
     "@types/pg": "^8.15.6",
+    "ts-prune": "^0.10.3",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
   }

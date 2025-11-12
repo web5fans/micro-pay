@@ -1,7 +1,7 @@
 import { PoolClient } from 'pg';
 import { query } from '../db';
 
-export interface PlatformAddress {
+interface PlatformAddress {
   id: number;
   address: string;
   index: number;
@@ -95,16 +95,6 @@ export async function getAvailablePlatformAddress() {
   } catch (error) {
     console.error('Error getting available platform address:', error);
     return null;
-  }
-}
-
-// Release platform address
-export async function releasePlatformAddress(index: number) {
-  try {
-    await query('UPDATE platform_address SET is_used = false, updated_at = NOW() WHERE index = $1', [index]);
-    console.log(`Released platform address: ${index}`);  
-  } catch (error) {
-    console.error('Error releasing platform address:', error);
   }
 }
 

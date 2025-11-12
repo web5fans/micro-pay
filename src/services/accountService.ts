@@ -3,7 +3,7 @@ import { getAvailablePlatformAddressWithTransaction } from '../models/platformAd
 import { withTransaction } from '../db';
 import { AccountingTransaction, getAddressBalance, MIN_WITHDRAWAL_AMOUNT, sendCkbTransaction, TRANSFER_FEE } from './ckbService';
 
-export async function accountCheck(): Promise<void> {
+async function accountCheck(): Promise<void> {
   try {
     console.log(`[Account Check] Starting to check account records...`);
     

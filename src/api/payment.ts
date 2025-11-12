@@ -1,7 +1,7 @@
 import express, { Request, Response } from 'express';
 import { preparePayment, completeTransfer } from '../services/paymentService';
-import { getPaymentById, getPaymentsBySenderPaged, countPaymentsByDid, getPaymentsByDidSorted } from '../models/payment';
-import { getAccountsByPaymentId, getAccountsByReceiverPaged, countAccountsByDid, getAccountsByDidSorted } from '../models/account';
+import { getPaymentById, getPaymentsBySenderPaged, countPaymentsBySenderDidFiltered, getPaymentsBySenderDidFiltered } from '../models/payment';
+import { getAccountsByPaymentId, getAccountsByReceiverPaged, countAccountsByReceiverDidFiltered, getAccountsByReceiverDidFiltered } from '../models/account';
 import { ErrorCode } from './errorCodes';
 
 export const paymentRouter = express.Router();
@@ -10,7 +10,7 @@ export const paymentRouter = express.Router();
 paymentRouter.post('/prepare', async (req: Request, res: Response) => {
   try {
     console.log('prepare Request body:', req.body);
-    const { sender, receiver, amount, splitReceivers, info, senderDid, receiverDid } = req.body;
+    const { sender, receiver, amount, splitReceivers, info, senderDid, receiverDid, category } = req.body;
     
     // Validate request parameters
     if (!sender || typeof sender !== 'string' || !receiver || typeof receiver !== 'string') {
@@ -36,7 +36,8 @@ paymentRouter.post('/prepare', async (req: Request, res: Response) => {
     }
     
     // Prepare payment
-    const result = await preparePayment(sender, receiver, amount, splitReceivers, info, senderDid ?? null, receiverDid ?? null);
+    const normalizedCategory = (typeof category === 'number' && Number.isInteger(category) && category >= 0) ? category : 0;
+    const result = await preparePayment(sender, receiver, amount, splitReceivers, info, senderDid ?? null, receiverDid ?? null, normalizedCategory);
     
     res.json(result);
   } catch (error) {
@@ -54,6 +55,10 @@ paymentRouter.post('/prepare', async (req: Request, res: Response) => {
       return res.status(422).json({ error: message, code: ErrorCode.INSUFFICIENT_BALANCE });
     }
     if (message.includes('No available platform address')) {
+      return res.status(503).json({ error: message, code: ErrorCode.NO_PLATFORM_ADDRESS });
+    }
+    // Platform cell not found
+    if (message.includes('Platform cell not found')) {
       return res.status(503).json({ error: message, code: ErrorCode.NO_PLATFORM_ADDRESS });
     }
     // Default to internal error
@@ -95,76 +100,6 @@ paymentRouter.post('/transfer', async (req: Request, res: Response) => {
   }
 });
 
-// Unified DID query endpoint
-paymentRouter.get('/did/:did', async (req: Request, res: Response) => {
-  try {
-    const { did } = req.params;
-    const { limit = '20', offset = '0' } = req.query as Record<string, string>;
-
-    // Basic validation
-    if (!did || typeof did !== 'string' || did.length > 200) {
-      return res.status(400).json({ error: 'Invalid DID', code: ErrorCode.VALIDATION_ERROR });
-    }
-    const limitNum = Number(limit);
-    const offsetNum = Number(offset);
-    if (!Number.isInteger(limitNum) || limitNum < 1 || limitNum > 100) {
-      return res.status(400).json({ error: 'Invalid limit (1-100)', code: ErrorCode.VALIDATION_ERROR });
-    }
-    if (!Number.isInteger(offsetNum) || offsetNum < 0) {
-      return res.status(400).json({ error: 'Invalid offset (>=0)', code: ErrorCode.VALIDATION_ERROR });
-    }
-
-    // Fetch enough results from each side, merge-sort by created_at desc, then paginate
-    const need = limitNum + offsetNum;
-    const [payments, accounts] = await Promise.all([
-      getPaymentsByDidSorted(did, need),
-      getAccountsByDidSorted(did, need)
-    ]);
-
-    let i = 0, j = 0;
-    const merged: Array<{ type: 'payment' | 'account'; id: number; sender: string | null; receiver: string | null; amount: number; info: string | null; status: number; tx_hash: string | null; created_at: Date }> = [];
-    while ((i < payments.length || j < accounts.length) && merged.length < need) {
-      const p = i < payments.length ? payments[i] : null;
-      const a = j < accounts.length ? accounts[j] : null;
-      if (p && (!a || p.created_at >= (a as any).created_at)) {
-        merged.push({ type: 'payment', id: p.id, sender: p.sender, receiver: null, amount: p.amount, info: p.info, status: p.status, tx_hash: p.tx_hash, created_at: p.created_at });
-        i++;
-      } else if (a) {
-        merged.push({ type: 'account', id: a.id, sender: null, receiver: a.receiver, amount: a.amount, info: a.info, status: a.status, tx_hash: a.tx_hash, created_at: a.created_at });
-        j++;
-      } else {
-        break;
-      }
-    }
-
-    const sliced = merged.slice(offsetNum, offsetNum + limitNum);
-    const [paymentCount, accountCount] = await Promise.all([
-      countPaymentsByDid(did),
-      countAccountsByDid(did)
-    ]);
-    const count = paymentCount + accountCount;
-
-    res.json({
-      items: sliced.map((r) => ({
-        type: r.type,
-        id: r.id,
-        sender: r.sender ?? undefined,
-        receiver: r.receiver,
-        amount: r.amount,
-        info: r.info,
-        status: r.status,
-        txHash: r.tx_hash,
-        createdAt: r.created_at,
-      })),
-      pagination: { limit: limitNum, offset: offsetNum, count }
-    });
-  } catch (error) {
-    console.error('Error in DID query endpoint:', error);
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    res.status(500).json({ error: message, code: ErrorCode.INTERNAL_ERROR });
-  }
-});
-
 // Query payment record by payment id
 paymentRouter.get('/:id', async (req: Request, res: Response) => {
   try {
@@ -182,18 +117,38 @@ paymentRouter.get('/:id', async (req: Request, res: Response) => {
     // Get split account records
     const accounts = await getAccountsByPaymentId(paymentId);
     
-    // Remove platform_address_index field from payment object
-    const { platform_address_index, ...paymentWithoutIndex } = payment;
+    const paymentResponse = {
+      id: (payment as any).id,
+      sender: (payment as any).sender,
+      receiver: (payment as any).receiver,
+      senderDid: (payment as any).sender_did ?? undefined,
+      receiverDid: (payment as any).receiver_did ?? undefined,
+      category: (payment as any).category,
+      amount: (payment as any).amount,
+      info: (payment as any).info ?? undefined,
+      status: (payment as any).status,
+      txHash: (payment as any).tx_hash ?? undefined,
+      createdAt: (payment as any).created_at,
+      updatedAt: (payment as any).updated_at,
+    };
 
-    // remove platform_address_indexes field from each account object
-    const accountsWithoutIndex = accounts.map(account => {
-      const { platform_address_indexes, ...accountWithoutIndex } = account;
-      return accountWithoutIndex;
-    });
-    
+    const accountsResponse = accounts.map((a: any) => ({
+      id: a.id,
+      paymentId: a.payment_id,
+      receiver: a.receiver,
+      receiverDid: a.receiver_did ?? undefined,
+      category: a.category,
+      amount: a.amount,
+      info: a.info ?? undefined,
+      status: a.status,
+      txHash: a.tx_hash ?? undefined,
+      createdAt: a.created_at,
+      updatedAt: a.updated_at,
+    }));
+
     res.json({
-      payment: paymentWithoutIndex,
-      accounts: accountsWithoutIndex
+      payment: paymentResponse,
+      accounts: accountsResponse,
     });
   } catch (error) {
     console.error('Error in get payment by id endpoint:', error);
@@ -220,13 +175,26 @@ paymentRouter.get('/sender/:address', async (req: Request, res: Response) => {
     // Get payment records paged
     const payments = await getPaymentsBySenderPaged(address, limit, offset);
     
-    // Remove platform_address_index field from each payment record
-    const paymentsWithoutIndex = payments.map(payment => {
-      const { platform_address_index, ...paymentWithoutIndex } = payment;
-      return paymentWithoutIndex;
+    // Map to camelCase response and remove platform_address_index
+    const items = payments.map((p) => {
+      const rest = p as any;
+      return {
+        id: rest.id,
+        sender: rest.sender,
+        receiver: rest.receiver,
+        senderDid: rest.sender_did ?? undefined,
+        receiverDid: rest.receiver_did ?? undefined,
+        category: rest.category,
+        amount: rest.amount,
+        info: rest.info ?? undefined,
+        status: rest.status,
+        txHash: rest.tx_hash ?? undefined,
+        createdAt: rest.created_at,
+        updatedAt: rest.updated_at,
+      };
     });
     
-    res.json({ items: paymentsWithoutIndex, pagination: { limit, offset, count: paymentsWithoutIndex.length } });
+    res.json({ items, pagination: { limit, offset, count: items.length } });
   } catch (error) {
     console.error('Error in get payments by sender endpoint:', error);
     const message = error instanceof Error ? error.message : 'Unknown error';
@@ -253,16 +221,142 @@ paymentRouter.get('/receiver/:address', async (req: Request, res: Response) => {
     // Get account records paged
     const accounts = await getAccountsByReceiverPaged(address, limit, offset);
     
-    // Remove platform_address_indexes field from each account record
-    const accountsWithoutIndex = accounts.map(account => {
-      const { platform_address_indexes, ...accountWithoutIndex } = account;
-      return accountWithoutIndex;
+    // Map to camelCase response and remove platform_address_indexes
+    const items = accounts.map((a) => {
+      const rest = a as any;
+      return {
+        id: rest.id,
+        paymentId: rest.payment_id,
+        receiver: rest.receiver,
+        receiverDid: rest.receiver_did ?? undefined,
+        category: rest.category,
+        amount: rest.amount,
+        info: rest.info ?? undefined,
+        status: rest.status,
+        txHash: rest.tx_hash ?? undefined,
+        createdAt: rest.created_at,
+        updatedAt: rest.updated_at,
+      };
     });
     
-    res.json({ items: accountsWithoutIndex, pagination: { limit, offset, count: accountsWithoutIndex.length } });
+    res.json({ items, pagination: { limit, offset, count: items.length } });
   } catch (error) {
     console.error('Error in get accounts by receiver endpoint:', error);
     const message = error instanceof Error ? error.message : 'Unknown error';
     res.status(500).json({ error: message, code: ErrorCode.INTERNAL_ERROR });
   }
 });
+
+// Query payments by sender DID with filters
+paymentRouter.get('/sender-did/:did', async (req: Request, res: Response) => {
+  try {
+    const { did } = req.params;
+    const { start, end, category, limit = '20', offset = '0' } = req.query as Record<string, string>;
+
+    if (!did || typeof did !== 'string' || did.length > 200) {
+      return res.status(400).json({ error: 'Invalid DID', code: ErrorCode.VALIDATION_ERROR });
+    }
+    const limitNum = Number(limit);
+    const offsetNum = Number(offset);
+    if (!Number.isInteger(limitNum) || limitNum < 1 || limitNum > 100) {
+      return res.status(400).json({ error: 'Invalid limit (1-100)', code: ErrorCode.VALIDATION_ERROR });
+    }
+    if (!Number.isInteger(offsetNum) || offsetNum < 0) {
+      return res.status(400).json({ error: 'Invalid offset (>=0)', code: ErrorCode.VALIDATION_ERROR });
+    }
+    const startDate = start ? new Date(start) : undefined;
+    const endDate = end ? new Date(end) : undefined;
+    if (start && isNaN(startDate!.getTime())) {
+      return res.status(400).json({ error: 'Invalid start date', code: ErrorCode.VALIDATION_ERROR });
+    }
+    if (end && isNaN(endDate!.getTime())) {
+      return res.status(400).json({ error: 'Invalid end date', code: ErrorCode.VALIDATION_ERROR });
+    }
+    const categoryNum = category !== undefined ? Number(category) : undefined;
+    if (category !== undefined && (!Number.isInteger(categoryNum!) || categoryNum! < 0)) {
+      return res.status(400).json({ error: 'Invalid category (>=0 integer)', code: ErrorCode.VALIDATION_ERROR });
+    }
+
+    const [items, count] = await Promise.all([
+      getPaymentsBySenderDidFiltered(did, startDate, endDate, categoryNum, limitNum, offsetNum),
+      countPaymentsBySenderDidFiltered(did, startDate, endDate, categoryNum)
+    ]);
+
+    res.json({
+      items: items.map(p => ({
+        id: p.id,
+        sender: p.sender,
+        receiver: p.receiver,
+        amount: p.amount,
+        info: p.info,
+        status: p.status,
+        txHash: p.tx_hash,
+        category: p.category,
+        createdAt: p.created_at
+      })),
+      pagination: { limit: limitNum, offset: offsetNum, count }
+    });
+  } catch (error) {
+    console.error('Error in sender DID query endpoint:', error);
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: message, code: ErrorCode.INTERNAL_ERROR });
+  }
+});
+
+// Query accounts by receiver DID with filters
+paymentRouter.get('/receiver-did/:did', async (req: Request, res: Response) => {
+  try {
+    const { did } = req.params;
+    const { start, end, category, limit = '20', offset = '0' } = req.query as Record<string, string>;
+
+    if (!did || typeof did !== 'string' || did.length > 200) {
+      return res.status(400).json({ error: 'Invalid DID', code: ErrorCode.VALIDATION_ERROR });
+    }
+    const limitNum = Number(limit);
+    const offsetNum = Number(offset);
+    if (!Number.isInteger(limitNum) || limitNum < 1 || limitNum > 100) {
+      return res.status(400).json({ error: 'Invalid limit (1-100)', code: ErrorCode.VALIDATION_ERROR });
+    }
+    if (!Number.isInteger(offsetNum) || offsetNum < 0) {
+      return res.status(400).json({ error: 'Invalid offset (>=0)', code: ErrorCode.VALIDATION_ERROR });
+    }
+    const startDate = start ? new Date(start) : undefined;
+    const endDate = end ? new Date(end) : undefined;
+    if (start && isNaN(startDate!.getTime())) {
+      return res.status(400).json({ error: 'Invalid start date', code: ErrorCode.VALIDATION_ERROR });
+    }
+    if (end && isNaN(endDate!.getTime())) {
+      return res.status(400).json({ error: 'Invalid end date', code: ErrorCode.VALIDATION_ERROR });
+    }
+    const categoryNum = category !== undefined ? Number(category) : undefined;
+    if (category !== undefined && (!Number.isInteger(categoryNum!) || categoryNum! < 0)) {
+      return res.status(400).json({ error: 'Invalid category (>=0 integer)', code: ErrorCode.VALIDATION_ERROR });
+    }
+
+    const [items, count] = await Promise.all([
+      getAccountsByReceiverDidFiltered(did, startDate, endDate, categoryNum, limitNum, offsetNum),
+      countAccountsByReceiverDidFiltered(did, startDate, endDate, categoryNum)
+    ]);
+
+    res.json({
+      items: items.map(a => ({
+        id: a.id,
+        paymentId: a.payment_id,
+        receiver: a.receiver,
+        amount: a.amount,
+        info: a.info,
+        status: a.status,
+        txHash: a.tx_hash,
+        category: a.category,
+        createdAt: a.created_at
+      })),
+      pagination: { limit: limitNum, offset: offsetNum, count }
+    });
+  } catch (error) {
+    console.error('Error in receiver DID query endpoint:', error);
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: message, code: ErrorCode.INTERNAL_ERROR });
+  }
+});
+
+

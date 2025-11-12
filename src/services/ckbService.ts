@@ -70,7 +70,7 @@ export async function initPlatformAddresses() {
   console.log(`Initialized ${platformAddresses.length} platform addresses`);
 }
 
-export async function getPrivateKey(index: number): Promise<string> {
+async function getPrivateKey(index: number): Promise<string> {
   if (!PLATFORM_MNEMONIC) {
     throw new Error('PLATFORM_MNEMONIC is not set');
   }
@@ -133,7 +133,7 @@ export async function build2to2Transaction(
     }
 
     if (sendSum < amount + MIN_WITHDRAWAL_AMOUNT) {
-      throw new Error('Sender not enough balance');
+      throw new Error('Sender does not have enough balance');
     }
 
     // Each platform address only has one cell

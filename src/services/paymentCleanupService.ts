@@ -7,7 +7,7 @@ import { withTransaction } from '../db';
  * Clean up timeout payment records
  * @param timeoutSeconds Timeout duration (seconds)
  */
-export async function cleanupTimeoutPayments(timeoutSeconds: number = 60): Promise<void> {
+async function cleanupTimeoutPayments(timeoutSeconds: number = 60): Promise<void> {
   try {
     console.log(`[Payment Cleanup] Starting to check timeout payment records (${timeoutSeconds} seconds)...`);
     

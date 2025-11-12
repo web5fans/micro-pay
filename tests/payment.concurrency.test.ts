@@ -1,7 +1,7 @@
 import { initDb, withTransaction, query } from '../src/db';
 import {
   createPaymentWithTransaction,
-  getUncompletedPaymentsBySender,
+  getTransferPaymentsBySender,
   updatePaymentStatusFromPrepareToTransfer,
   updatePaymentStatusFromTransferToPrepare,
 } from '../src/models/payment';
@@ -41,7 +41,7 @@ async function testConcurrentPrepareCreatesDuplicateUncompleted() {
   if (successCount !== 1 || !hasUniqueViolation) {
     throw new Error(`Expected one success and one unique-constraint failure; got successCount=${successCount}, uniqueViolation=${hasUniqueViolation}`);
   }
-  const uncompleted = await getUncompletedPaymentsBySender(sender);
+  const uncompleted = await getTransferPaymentsBySender(sender);
   if (uncompleted.length !== 1) {
     throw new Error(`Expected 1 active payment after race; found ${uncompleted.length}`);
   }
@@ -70,7 +70,7 @@ async function testStatusTransitionRaceSafety() {
   await Promise.all([r1, r2]);
 
   // Verify final status by reading back
-  const afterRace = await getUncompletedPaymentsBySender(sender);
+  const afterRace = await getTransferPaymentsBySender(sender);
   // Should have exactly one uncompleted payment for sender_b
   if (afterRace.length !== 1) {
     throw new Error('Unexpected number of uncompleted payments after race on status update');

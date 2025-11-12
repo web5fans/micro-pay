@@ -29,13 +29,17 @@ async function partSignTx(rawTx: string) {
 
 type SplitReceiver = {
   address: string;
+  receiverDid: string | null;
   splitRate: number;
 };
 
 type PreparePayload = {
   sender: string;
+  senderDid: string | null;
   receiver: string;
+  receiverDid: string | null;
   amount: number;
+  category: number;
   splitReceivers: SplitReceiver[];
   info: string;
 };
@@ -46,18 +50,23 @@ async function callPrepare() {
   const payload: PreparePayload = {
     sender:
       senderAddr,
+    senderDid: "did:ckb:sender",
     receiver:
       receiverAddr,
+    receiverDid: "did:ckb:receiver",
     amount: 5_000_000_000,
+    category: 0,
     splitReceivers: [
       {
         address:
           'ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsq0stn7whuvhjc2gm0frkjrg80wqac7xvlqf5qh7w',
+        receiverDid: "did:ckb:spliter1",
         splitRate: 10,
       },
       {
         address:
           'ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqfj3fq244fc9r82gt5hcka9ertn46pwkmgtu7ced',
+        receiverDid: "did:ckb:spliter2",
         splitRate: 20,
       },
     ],

@@ -1,11 +1,12 @@
 import { PoolClient } from 'pg';
 import { query } from '../db';
 
-export interface Account {
+interface Account {
   id: number;
   payment_id: number;
   receiver: string;
   receiver_did?: string | null;
+  category: number;
   platform_address_indexes: string;
   amount: number;
   info: string | null;
@@ -23,13 +24,14 @@ export async function createAccountWithTransaction(
   amount: number,
   info: string | null = null,
   platform_address_indexes: string = '',
-  receiver_did: string | null = null
+  receiver_did: string | null = null,
+  category: number = 0
 ) {
   const result = await client.query(
-    `INSERT INTO account (payment_id, receiver, platform_address_indexes, amount, info, status, receiver_did)
-     VALUES ($1, $2, $3, $4, $5, 0, $6)
+    `INSERT INTO account (payment_id, receiver, platform_address_indexes, amount, info, status, receiver_did, category)
+     VALUES ($1, $2, $3, $4, $5, 0, $6, $7)
      RETURNING *`,
-    [payment_id, receiver, platform_address_indexes, amount, info, receiver_did]
+    [payment_id, receiver, platform_address_indexes, amount, info, receiver_did, category]
   );
   
   return result.rows[0];
@@ -156,15 +158,6 @@ export async function updateAccountStatusFromAccountingToCompleteByTransactionHa
   return result.rows;
 }
 
-export async function getAccountsByReceiver(receiver: string): Promise<Account[]> {
-  const result = await query(
-    `SELECT * FROM account WHERE receiver = $1`,
-    [receiver]
-  );
-  
-  return result.rows;
-}
-
 export async function getAccountsByReceiverPaged(receiver: string, limit: number, offset: number): Promise<Account[]> {
   const result = await query(
     `SELECT * FROM account 
@@ -176,22 +169,41 @@ export async function getAccountsByReceiverPaged(receiver: string, limit: number
   return result.rows;
 }
 
-// DID helpers: account side
-export async function countAccountsByDid(did: string): Promise<number> {
-  const result = await query(
-    `SELECT COUNT(*) AS total FROM account WHERE receiver_did = $1`,
-    [did]
-  );
+// Filtered queries: by receiver_did with optional time range and category, with pagination
+export async function countAccountsByReceiverDidFiltered(
+  did: string,
+  start?: Date,
+  end?: Date,
+  category?: number
+): Promise<number> {
+  const where: string[] = ['receiver_did = $1'];
+  const params: any[] = [did];
+  let idx = 2;
+  if (start) { where.push(`created_at >= $${idx++}`); params.push(start); }
+  if (end) { where.push(`created_at <= $${idx++}`); params.push(end); }
+  if (typeof category === 'number') { where.push(`category = $${idx++}`); params.push(category); }
+  const sql = `SELECT COUNT(*) AS total FROM account WHERE ${where.join(' AND ')}`;
+  const result = await query(sql, params);
   return parseInt(result.rows[0]?.total ?? '0', 10);
 }
 
-export async function getAccountsByDidSorted(did: string, limit: number): Promise<Account[]> {
-  const result = await query(
-    `SELECT * FROM account 
-     WHERE receiver_did = $1 
-     ORDER BY created_at DESC 
-     LIMIT $2`,
-    [did, limit]
-  );
+export async function getAccountsByReceiverDidFiltered(
+  did: string,
+  start: Date | undefined,
+  end: Date | undefined,
+  category: number | undefined,
+  limit: number,
+  offset: number
+): Promise<Account[]> {
+  const where: string[] = ['receiver_did = $1'];
+  const params: any[] = [did];
+  let idx = 2;
+  if (start) { where.push(`created_at >= $${idx++}`); params.push(start); }
+  if (end) { where.push(`created_at <= $${idx++}`); params.push(end); }
+  if (typeof category === 'number') { where.push(`category = $${idx++}`); params.push(category); }
+  params.push(limit);
+  params.push(offset);
+  const sql = `SELECT * FROM account WHERE ${where.join(' AND ')} ORDER BY created_at DESC LIMIT $${idx} OFFSET $${idx + 1}`;
+  const result = await query(sql, params);
   return result.rows;
 }
