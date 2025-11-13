@@ -174,13 +174,14 @@ export async function getAccountsByReceiverPaged(receiver: string, limit: number
 }
 
 // Filtered queries: by receiver_did with optional time range and category, with pagination
+// Only include status = 1 (complete), status = 3 (accounting), status = 4 (accounted)
 export async function countAccountsByReceiverDidFiltered(
   did: string,
   start?: Date,
   end?: Date,
   category?: number
 ): Promise<number> {
-  const where: string[] = ['receiver_did = $1'];
+  const where: string[] = ['receiver_did = $1 AND (status = 1 OR status = 3 OR status = 4)'];
   const params: any[] = [did];
   let idx = 2;
   if (start) { where.push(`created_at >= $${idx++}`); params.push(start); }
@@ -199,7 +200,7 @@ export async function getAccountsByReceiverDidFiltered(
   limit: number,
   offset: number
 ): Promise<Account[]> {
-  const where: string[] = ['receiver_did = $1'];
+  const where: string[] = ['receiver_did = $1 AND (status = 1 OR status = 3 OR status = 4)'];
   const params: any[] = [did];
   let idx = 2;
   if (start) { where.push(`created_at >= $${idx++}`); params.push(start); }

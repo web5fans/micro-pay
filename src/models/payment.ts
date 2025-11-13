@@ -230,13 +230,14 @@ export async function countCompletedPaymentsByInfo(info: string): Promise<number
 }
 
 // Filtered queries: by sender_did with optional time range and category, with pagination
+// Only include status = 1 (transfer), status = 2 (completed)
 export async function countPaymentsBySenderDidFiltered(
   did: string,
   start?: Date,
   end?: Date,
   category?: number
 ): Promise<number> {
-  const where: string[] = ['sender_did = $1'];
+  const where: string[] = ['sender_did = $1 AND (status = 1 OR status = 2)'];
   const params: any[] = [did];
   let idx = 2;
   if (start) { where.push(`created_at >= $${idx++}`); params.push(start); }
@@ -255,7 +256,7 @@ export async function getPaymentsBySenderDidFiltered(
   limit: number,
   offset: number
 ): Promise<Payment[]> {
-  const where: string[] = ['sender_did = $1'];
+  const where: string[] = ['sender_did = $1 AND (status = 1 OR status = 2)'];
   const params: any[] = [did];
   let idx = 2;
   if (start) { where.push(`created_at >= $${idx++}`); params.push(start); }
