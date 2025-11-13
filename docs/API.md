@@ -298,27 +298,31 @@ curl -s -X POST http://localhost:3000/api/payment/transfer \
   "items": [
     {
       "id": 6,
-      "paymentId": 2,
+      "paymentId": 3,
+      "sender": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqwu8lmjcalepgp5k6d4j0mtxwww68v9m6qz0q8ah",
+      "senderDid": "did:ckb:sender",
       "receiver": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqttz30qvq8rlht9r9wc6lqu27x6ykx5eyskhysra",
       "receiverDid": "did:ckb:receiver",
       "category": 0,
       "amount": "3500000000",
       "info": "post_id",
       "status": 1,
-      "createdAt": "2025-11-11T22:26:35.638Z",
-      "updatedAt": "2025-11-11T22:27:20.744Z"
+      "createdAt": "2025-11-13T00:44:17.927Z",
+      "updatedAt": "2025-11-13T00:44:46.717Z"
     },
     {
       "id": 3,
-      "paymentId": 1,
+      "paymentId": 2,
+      "sender": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqwu8lmjcalepgp5k6d4j0mtxwww68v9m6qz0q8ah",
+      "senderDid": "did:ckb:sender",
       "receiver": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqttz30qvq8rlht9r9wc6lqu27x6ykx5eyskhysra",
       "receiverDid": "did:ckb:receiver",
       "category": 0,
       "amount": "3500000000",
       "info": "post_id",
       "status": 2,
-      "createdAt": "2025-11-11T22:26:34.376Z",
-      "updatedAt": "2025-11-11T22:26:35.638Z"
+      "createdAt": "2025-11-13T00:44:16.813Z",
+      "updatedAt": "2025-11-13T00:44:17.927Z"
     }
   ],
   "pagination": {
@@ -329,7 +333,7 @@ curl -s -X POST http://localhost:3000/api/payment/transfer \
 }
 ```
 ### GET /api/payment/sender-did/:did
-- 描述：按 `senderDid` 查询 payment 记录，支持时间范围与分类过滤并分页。
+- 描述：按 `senderDid` 查询 payment 记录，只包含status=1(transfer)和status=2(completed)，支持时间范围与分类过滤并分页。
 - Query 参数：
   - `start`（可选）：开始时间，ISO 字符串，如 `2025-01-01T00:00:00Z`
   - `end`（可选）：结束时间，ISO 字符串
@@ -341,41 +345,54 @@ curl -s -X POST http://localhost:3000/api/payment/transfer \
 {
   "items": [
     {
-      "id": 123,
-      "sender": "ckt...",
-      "receiver": "ckt...",
-      "amount": 5000000000,
+      "id": 3,
+      "sender": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqwu8lmjcalepgp5k6d4j0mtxwww68v9m6qz0q8ah",
+      "senderDid": "did:ckb:sender",
+      "receiver": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqttz30qvq8rlht9r9wc6lqu27x6ykx5eyskhysra",
+      "receiverDid": "did:ckb:receiver",
+      "category": 0,
+      "amount": "5000000000",
       "info": "post_id",
       "status": 2,
-      "txHash": "0x...",
-      "category": 0,
-      "createdAt": "2025-01-01T00:00:00.000Z"
+      "txHash": "0xeb969fa75ec436ac46117cf0d651444e34d566cfe1897739e3b775461b7049f2",
+      "createdAt": "2025-11-13T00:44:17.927Z"
     }
   ],
-  "pagination": { "limit": 20, "offset": 0, "count": 42 }
+  "pagination": {
+    "limit": 50,
+    "offset": 0,
+    "count": 1
+  }
 }
 ```
 
 ### GET /api/payment/receiver-did/:did
-- 描述：按 `receiverDid` 查询 account 记录，支持时间范围与分类过滤并分页。
+- 描述：按 `receiverDid` 查询 account 记录，只包含status=1(payment completed),status=3(accounting)和status=4(accounted)，支持时间范围与分类过滤并分页。
 - Query 参数：同上。
 - 响应：
 ```json
 {
   "items": [
     {
-      "id": 456,
-      "paymentId": 123,
-      "receiver": "ckt...",
-      "amount": 1500000000,
+      "id": 6,
+      "paymentId": 3,
+      "sender": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqwu8lmjcalepgp5k6d4j0mtxwww68v9m6qz0q8ah",
+      "senderDid": "did:ckb:sender",
+      "receiver": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqttz30qvq8rlht9r9wc6lqu27x6ykx5eyskhysra",
+      "receiverDid": "did:ckb:receiver",
+      "category": 0,
+      "amount": "3500000000",
       "info": "post_id",
       "status": 1,
-      "txHash": "0x...",
-      "category": 0,
-      "createdAt": "2025-01-01T00:00:00.000Z"
+      "txHash": null,
+      "createdAt": "2025-11-13T00:44:17.927Z"
     }
   ],
-  "pagination": { "limit": 20, "offset": 0, "count": 17 }
+  "pagination": {
+    "limit": 50,
+    "offset": 0,
+    "count": 1
+  }
 }
 ```
 ### GET /api/payment/completed-total

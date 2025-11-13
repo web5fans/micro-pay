@@ -364,27 +364,31 @@ curl -s -X GET http://localhost:3000/api/payment/receiver/ckt1qzda0cr08m85hc8jln
   "items": [
     {
       "id": 6,
-      "paymentId": 2,
+      "paymentId": 3,
+      "sender": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqwu8lmjcalepgp5k6d4j0mtxwww68v9m6qz0q8ah",
+      "senderDid": "did:ckb:sender",
       "receiver": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqttz30qvq8rlht9r9wc6lqu27x6ykx5eyskhysra",
       "receiverDid": "did:ckb:receiver",
       "category": 0,
       "amount": "3500000000",
       "info": "post_id",
       "status": 1,
-      "createdAt": "2025-11-11T22:26:35.638Z",
-      "updatedAt": "2025-11-11T22:27:20.744Z"
+      "createdAt": "2025-11-13T00:44:17.927Z",
+      "updatedAt": "2025-11-13T00:44:46.717Z"
     },
     {
       "id": 3,
-      "paymentId": 1,
+      "paymentId": 2,
+      "sender": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqwu8lmjcalepgp5k6d4j0mtxwww68v9m6qz0q8ah",
+      "senderDid": "did:ckb:sender",
       "receiver": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqttz30qvq8rlht9r9wc6lqu27x6ykx5eyskhysra",
       "receiverDid": "did:ckb:receiver",
       "category": 0,
       "amount": "3500000000",
       "info": "post_id",
       "status": 2,
-      "createdAt": "2025-11-11T22:26:34.376Z",
-      "updatedAt": "2025-11-11T22:26:35.638Z"
+      "createdAt": "2025-11-13T00:44:16.813Z",
+      "updatedAt": "2025-11-13T00:44:17.927Z"
     }
   ],
   "pagination": {
@@ -395,7 +399,7 @@ curl -s -X GET http://localhost:3000/api/payment/receiver/ckt1qzda0cr08m85hc8jln
 }
 ``` 
 
-7. 根据senderDid查询支付记录
+7. 根据senderDid查询支付记录(只包含status=1(transfer)和status=2(completed))
 ``` 
 curl -s -G "http://localhost:3000/api/payment/sender-did/did:ckb:sender" --data-urlencode "start=2025-01-01T00:00:00Z" --data-urlencode "end=2025-12-31T23:59:59Z" --data "category=0" --data "limit=50" --data "offset=0" | jq .
 ```
@@ -404,37 +408,28 @@ curl -s -G "http://localhost:3000/api/payment/sender-did/did:ckb:sender" --data-
 {
   "items": [
     {
-      "id": 2,
+      "id": 3,
       "sender": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqwu8lmjcalepgp5k6d4j0mtxwww68v9m6qz0q8ah",
+      "senderDid": "did:ckb:sender",
       "receiver": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqttz30qvq8rlht9r9wc6lqu27x6ykx5eyskhysra",
+      "receiverDid": "did:ckb:receiver",
+      "category": 0,
       "amount": "5000000000",
       "info": "post_id",
       "status": 2,
-      "txHash": "0x8070973e4505ac92c9b4cb3e9927365fff3c1e164c942fcee604381cf0f73ba1",
-      "category": 0,
-      "createdAt": "2025-11-11T22:26:35.638Z"
-    },
-    {
-      "id": 1,
-      "sender": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqwu8lmjcalepgp5k6d4j0mtxwww68v9m6qz0q8ah",
-      "receiver": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqttz30qvq8rlht9r9wc6lqu27x6ykx5eyskhysra",
-      "amount": "5000000000",
-      "info": "post_id",
-      "status": 3,
-      "txHash": "0x8070973e4505ac92c9b4cb3e9927365fff3c1e164c942fcee604381cf0f73ba1",
-      "category": 0,
-      "createdAt": "2025-11-11T22:26:34.376Z"
+      "txHash": "0xeb969fa75ec436ac46117cf0d651444e34d566cfe1897739e3b775461b7049f2",
+      "createdAt": "2025-11-13T00:44:17.927Z"
     }
   ],
   "pagination": {
     "limit": 50,
     "offset": 0,
-    "count": 2
+    "count": 1
   }
 }
 ```
 
-8. 根据receiverDid查询收款记录
+8. 根据receiverDid查询收款记录,只包含status=1(payment completed),status=3(accounting)和status=4(accounted)
 ``` 
 curl -s -G "http://localhost:3000/api/payment/receiver-did/did:ckb:receiver" --data-urlencode "start=2025-01-01T00:00:00Z" --data-urlencode "end=2025-12-31T23:59:59Z" --data "category=0" --data "limit=50" --data "offset=0" | jq .
 ```
@@ -444,31 +439,23 @@ curl -s -G "http://localhost:3000/api/payment/receiver-did/did:ckb:receiver" --d
   "items": [
     {
       "id": 6,
-      "paymentId": 2,
+      "paymentId": 3,
+      "sender": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqwu8lmjcalepgp5k6d4j0mtxwww68v9m6qz0q8ah",
+      "senderDid": "did:ckb:sender",
       "receiver": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqttz30qvq8rlht9r9wc6lqu27x6ykx5eyskhysra",
+      "receiverDid": "did:ckb:receiver",
+      "category": 0,
       "amount": "3500000000",
       "info": "post_id",
       "status": 1,
       "txHash": null,
-      "category": 0,
-      "createdAt": "2025-11-11T22:26:35.638Z"
-    },
-    {
-      "id": 3,
-      "paymentId": 1,
-      "receiver": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqttz30qvq8rlht9r9wc6lqu27x6ykx5eyskhysra",
-      "amount": "3500000000",
-      "info": "post_id",
-      "status": 2,
-      "txHash": null,
-      "category": 0,
-      "createdAt": "2025-11-11T22:26:34.376Z"
+      "createdAt": "2025-11-13T00:44:17.927Z"
     }
   ],
   "pagination": {
     "limit": 50,
     "offset": 0,
-    "count": 2
+    "count": 1
   }
 }
 ```

@@ -32,10 +32,10 @@ export async function createAccountWithTransaction(
   category: number = 0
 ) {
   const result = await client.query(
-    `INSERT INTO account (payment_id, sender, sender_did, receiver, receiver_did, platform_address_indexes, amount, info, status, receiver_did, category)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 0, $9, $10)
+    `INSERT INTO account (payment_id, sender, sender_did, receiver, receiver_did, platform_address_indexes, amount, info, status, category)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 0, $9)
      RETURNING *`,
-    [payment_id, sender, sender_did, receiver, receiver_did, platform_address_indexes, amount, info, receiver_did, category]
+    [payment_id, sender, sender_did, receiver, receiver_did, platform_address_indexes, amount, info, category]
   );
   
   return result.rows[0];
