@@ -103,6 +103,9 @@ export async function build2to2Transaction(
   amount: bigint
 ) {
   try {
+    // clean client cache
+    await cccClient.cache.clear();
+
     const senderAddr = await Address.fromString(senderAddress, cccClient);
     const platformAddr = await Address.fromString(platformAddress, cccClient);
 
@@ -116,6 +119,9 @@ export async function build2to2Transaction(
       platformAddr.script
     );
 
+    // fixed fee
+    const fee = TRANSFER_FEE;
+
     // Select suitable cells as transaction inputs
     let sendSum = BigInt(0);
     const senderCells = [];
@@ -127,7 +133,7 @@ export async function build2to2Transaction(
     )) {
       sendSum += BigInt(cell.cellOutput.capacity);
       senderCells.push(cell);
-      if (sendSum >= amount + MIN_WITHDRAWAL_AMOUNT) {
+      if (sendSum >= amount + MIN_WITHDRAWAL_AMOUNT + fee) {
         break;
       }
     }
@@ -178,8 +184,6 @@ export async function build2to2Transaction(
       });
     }
 
-    // fixed fee
-    const fee = TRANSFER_FEE;
     const outputs = [
       {
         capacity: `${platformSum + amount}`,
