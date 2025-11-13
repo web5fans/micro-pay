@@ -104,18 +104,20 @@ export async function preparePayment(
       // Create split receiver account records
       for (const splitReceiver of splitReceivers) {
         const splitAmount = Math.floor(amount * splitReceiver.splitRate / 100);
-        await createAccountWithTransaction(client, payment.id, splitReceiver.address, splitAmount, info, '', splitReceiver.receiverDid, category ?? 0);
+        await createAccountWithTransaction(client, payment.id, senderAddress, senderDid, splitReceiver.address, splitReceiver.receiverDid, splitAmount, info, '', category ?? 0);
       }
 
       // Create receiver account record
       await createAccountWithTransaction(
         client, 
         payment.id, 
+        senderAddress, 
+        senderDid,
         receiverAddress, 
+        receiverDid,
         Math.floor(amount * receiverSplitRate / 100),
         info,
         '',
-        receiverDid,
         category ?? 0
       );
 

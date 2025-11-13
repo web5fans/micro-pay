@@ -4,6 +4,8 @@ import { query } from '../db';
 interface Account {
   id: number;
   payment_id: number;
+  sender: string;
+  sender_did?: string | null;
   receiver: string;
   receiver_did?: string | null;
   category: number;
@@ -20,18 +22,20 @@ interface Account {
 export async function createAccountWithTransaction(
   client: PoolClient,
   payment_id: number,
+  sender: string,
+  sender_did: string | null = null,
   receiver: string,
+  receiver_did: string | null = null,
   amount: number,
   info: string | null = null,
   platform_address_indexes: string = '',
-  receiver_did: string | null = null,
   category: number = 0
 ) {
   const result = await client.query(
-    `INSERT INTO account (payment_id, receiver, platform_address_indexes, amount, info, status, receiver_did, category)
-     VALUES ($1, $2, $3, $4, $5, 0, $6, $7)
+    `INSERT INTO account (payment_id, sender, sender_did, receiver, receiver_did, platform_address_indexes, amount, info, status, receiver_did, category)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 0, $9, $10)
      RETURNING *`,
-    [payment_id, receiver, platform_address_indexes, amount, info, receiver_did, category]
+    [payment_id, sender, sender_did, receiver, receiver_did, platform_address_indexes, amount, info, receiver_did, category]
   );
   
   return result.rows[0];

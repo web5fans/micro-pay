@@ -103,6 +103,8 @@ CREATE TABLE IF NOT EXISTS payment(
 CREATE TABLE IF NOT EXISTS account(
     id BIGINT PRIMARY KEY,
     payment_id BIGINT,
+    sender TEXT,
+    sender_did TEXT,    // identity multi sender point to same person
     receiver TEXT,
     receiver_did TEXT,    // identity multi receiver point to same person
     platform_address_indexes TEXT,

@@ -59,6 +59,8 @@ export async function initDb() {
       CREATE TABLE IF NOT EXISTS account(
         id SERIAL PRIMARY KEY,
         payment_id INTEGER NOT NULL REFERENCES payment(id),
+        sender TEXT NOT NULL,
+        sender_did TEXT,
         receiver TEXT NOT NULL,
         receiver_did TEXT,
         category INTEGER NOT NULL DEFAULT 0,

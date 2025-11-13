@@ -227,6 +227,8 @@ paymentRouter.get('/receiver/:address', async (req: Request, res: Response) => {
       return {
         id: rest.id,
         paymentId: rest.payment_id,
+        sender: rest.sender,
+        senderDid: rest.sender_did ?? undefined,
         receiver: rest.receiver,
         receiverDid: rest.receiver_did ?? undefined,
         category: rest.category,
@@ -286,12 +288,14 @@ paymentRouter.get('/sender-did/:did', async (req: Request, res: Response) => {
       items: items.map(p => ({
         id: p.id,
         sender: p.sender,
+        senderDid: p.sender_did ?? undefined,
         receiver: p.receiver,
+        receiverDid: p.receiver_did ?? undefined,
+        category: p.category,
         amount: p.amount,
         info: p.info,
         status: p.status,
         txHash: p.tx_hash,
-        category: p.category,
         createdAt: p.created_at
       })),
       pagination: { limit: limitNum, offset: offsetNum, count }
@@ -342,12 +346,15 @@ paymentRouter.get('/receiver-did/:did', async (req: Request, res: Response) => {
       items: items.map(a => ({
         id: a.id,
         paymentId: a.payment_id,
+        sender: a.sender,
+        senderDid: a.sender_did ?? undefined,
         receiver: a.receiver,
+        receiverDid: a.receiver_did ?? undefined,
+        category: a.category,
         amount: a.amount,
         info: a.info,
         status: a.status,
         txHash: a.tx_hash,
-        category: a.category,
         createdAt: a.created_at
       })),
       pagination: { limit: limitNum, offset: offsetNum, count }
