@@ -17,6 +17,7 @@ initLogger();
 // Create Express application
 const app = express();
 const port = process.env.PORT || 3000;
+const accountCheckInterval = parseInt(process.env.ACCOUNT_CHECK_INTERVAL || '14400', 10);
 
 // Middleware
 app.use(express.json());
@@ -48,7 +49,7 @@ async function startServer() {
 
     // Start periodic check account records
     // Check every 4 * 60 * 60 seconds, account records with status 'transfer' will be checked
-    startAccountCheckTask(4 * 60 * 60);
+    startAccountCheckTask(accountCheckInterval);
     
     app.listen(port, () => {
       console.log(`Server is running at http://localhost:${port}`);
