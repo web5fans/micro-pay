@@ -523,10 +523,10 @@ curl -s "http://localhost:3000/api/payment/did-stats/did:ckb:sender" | jq .
 ```
 {
   "did": "did:ckb:sender",
-  "monthlyExpense": 10000000000,
-  "monthlyIncome": 0,
-  "totalExpense": 10000000000,
-  "totalIncome": 0
+  "monthlyExpense": "10000000000",
+  "monthlyIncome": "0",
+  "totalExpense": "10000000000",
+  "totalIncome": "0"
 }
 ```
 

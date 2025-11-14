@@ -462,9 +462,9 @@ curl -s -X POST http://localhost:3000/api/payment/transfer \
 ```json
 {
   "did": "did:ckb:user",
-  "monthlyExpense": 5000000000,
-  "monthlyIncome": 3500000000,
-  "totalExpense": 15000000000,
-  "totalIncome": 9000000000
+  "monthlyExpense": "5000000000",
+  "monthlyIncome": "3500000000",
+  "totalExpense": "15000000000",
+  "totalIncome": "9000000000"
 }
 ```
