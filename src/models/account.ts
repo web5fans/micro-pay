@@ -216,7 +216,7 @@ export async function getAccountsByReceiverDidFiltered(
 export async function sumAccountsByReceiverDid(
   did: string,
   start?: Date
-): Promise<number> {
+): Promise<string> {
   const where: string[] = ['receiver_did = $1 AND (status = 1 OR status = 3 OR status = 4)'];
   const params: any[] = [did];
   let idx = 2;
@@ -224,5 +224,5 @@ export async function sumAccountsByReceiverDid(
   const sql = `SELECT COALESCE(SUM(amount), 0) AS total FROM account WHERE ${where.join(' AND ')}`;
   const result = await query(sql, params);
   const total = result.rows[0]?.total;
-  return typeof total === 'string' ? parseInt(total, 10) : (total ?? 0);
+  return total ?? '0';
 }
