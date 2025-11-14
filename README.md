@@ -515,6 +515,21 @@ curl -s "http://localhost:3000/api/payment/completed?info=post_id" | jq .
 }
 ```
 
+11. 根据did查询统计信息
+``` 
+curl -s "http://localhost:3000/api/payment/did-stats/did:ckb:sender" | jq .
+```
+响应
+```
+{
+  "did": "did:ckb:sender",
+  "monthlyExpense": 10000000000,
+  "monthlyIncome": 0,
+  "totalExpense": 10000000000,
+  "totalIncome": 0
+}
+```
+
 
 ## TODO
 - [X] 事务保障需要完善

@@ -1,7 +1,7 @@
 import express, { Request, Response } from 'express';
 import { preparePayment, completeTransfer } from '../services/paymentService';
-import { getPaymentById, getPaymentsBySenderPaged, countPaymentsBySenderDidFiltered, getPaymentsBySenderDidFiltered, sumCompletedPaymentsByInfo, getCompletedPaymentsByInfoPaged, countCompletedPaymentsByInfo } from '../models/payment';
-import { getAccountsByPaymentId, getAccountsByReceiverPaged, countAccountsByReceiverDidFiltered, getAccountsByReceiverDidFiltered } from '../models/account';
+import { getPaymentById, getPaymentsBySenderPaged, countPaymentsBySenderDidFiltered, getPaymentsBySenderDidFiltered, sumCompletedPaymentsByInfo, getCompletedPaymentsByInfoPaged, countCompletedPaymentsByInfo, sumCompletedPaymentsBySenderDid } from '../models/payment';
+import { getAccountsByPaymentId, getAccountsByReceiverPaged, countAccountsByReceiverDidFiltered, getAccountsByReceiverDidFiltered, sumAccountsByReceiverDid } from '../models/account';
 import { ErrorCode } from './errorCodes';
 
 export const paymentRouter = express.Router();
@@ -366,6 +366,38 @@ paymentRouter.get('/receiver-did/:did', async (req: Request, res: Response) => {
   }
 });
 
+// DID stats: monthly and historical income/expense
+paymentRouter.get('/did-stats/:did', async (req: Request, res: Response) => {
+  try {
+    const { did } = req.params;
+    if (!did || typeof did !== 'string' || did.length > 200) {
+      return res.status(400).json({ error: 'Invalid DID', code: ErrorCode.VALIDATION_ERROR });
+    }
+
+    const now = new Date();
+    const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    const [monthlyExpense, monthlyIncome, totalExpense, totalIncome] = await Promise.all([
+      sumCompletedPaymentsBySenderDid(did, monthAgo),
+      sumAccountsByReceiverDid(did, monthAgo),
+      sumCompletedPaymentsBySenderDid(did),
+      sumAccountsByReceiverDid(did)
+    ]);
+
+    res.json({
+      did,
+      monthlyExpense,
+      monthlyIncome,
+      totalExpense,
+      totalIncome
+    });
+  } catch (error) {
+    console.error('Error in DID stats endpoint:', error);
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: message, code: ErrorCode.INTERNAL_ERROR });
+  }
+});
+
 // Completed payments total by info (query param)
 paymentRouter.get('/completed-total', async (req: Request, res: Response) => {
   try {
@@ -423,5 +455,4 @@ paymentRouter.get('/completed', async (req: Request, res: Response) => {
     res.status(500).json({ error: message, code: ErrorCode.INTERNAL_ERROR });
   }
 });
-
 

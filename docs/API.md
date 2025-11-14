@@ -451,3 +451,20 @@ curl -s -X POST http://localhost:3000/api/payment/transfer \
   }
 }
 ```
+
+### GET /api/payment/did-stats/:did
+- 描述：按 `did` 返回 4 项统计：
+  - `monthlyExpense`：最近一个月总支出（`payment` 中 `sender_did = did` 且 `status = 2` 的金额总和）
+  - `monthlyIncome`：最近一个月总收入（`account` 中 `receiver_did = did` 且 `status ∈ {1,3,4}` 的金额总和）
+  - `totalExpense`：历史总支出（同上，无时间限制）
+  - `totalIncome`：历史总收入（同上，无时间限制）
+- 响应：
+```json
+{
+  "did": "did:ckb:user",
+  "monthlyExpense": 5000000000,
+  "monthlyIncome": 3500000000,
+  "totalExpense": 15000000000,
+  "totalIncome": 9000000000
+}
+```
