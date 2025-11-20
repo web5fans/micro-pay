@@ -1,69 +1,124 @@
-import { createPayment, createPaymentWithTransaction, getPaymentById, updatePaymentStatus } from '../models/payment';
-import { createAccount, createAccountWithTransaction } from '../models/account';
-import { getAvailablePlatformAddressWithTransaction } from '../models/platformAddress';
-import { build2to2Transaction, sendTransaction } from './ckbService';
+import { createPaymentWithTransaction, getTransferPaymentsBySender, getTransferPaymentsBySenderDid, updatePaymentFromPrepareToCancelBySenderDidWithTransaction, updatePaymentFromPrepareToCancelBySenderWithTransaction, updatePaymentStatusFromPrepareToTransfer, updatePaymentStatusFromTransferToPrepare } from '../models/payment';
+import { createAccountWithTransaction, updateAccountStatusFromPrepareToCancelWithTransaction } from '../models/account';
+import { getAvailablePlatformAddressWithTransaction, releasePlatformAddressWithTransaction } from '../models/platformAddress';
+import { build2to2Transaction, completeTransaction, getAddressBalance, MIN_WITHDRAWAL_AMOUNT } from './ckbService';
 import { withTransaction } from '../db';
-import { PoolClient } from 'pg';
 
-// 分账接收者接口
+// Split receiver interface
 interface SplitReceiver {
   address: string;
+  receiverDid: string | null;
   splitRate: number;
 }
 
-// 准备支付
+// Prepare payment
 export async function preparePayment(
   senderAddress: string,
   receiverAddress: string,
   amount: number,
   splitReceivers: SplitReceiver[] = [],
-  info: string | null = null
+  info: string | null = null,
+  senderDid: string | null = null,
+  receiverDid: string | null = null,
+  category: number = 0
 ) {
+  // Check if sender address has enough balance
+  const senderBalance = await getAddressBalance(senderAddress);
+  if (senderBalance < BigInt(amount) + MIN_WITHDRAWAL_AMOUNT) {
+    throw new Error('Sender does not have enough balance');
+  }
+
+  // If sender has transfer payments, return error
+  const existingPayment = await getTransferPaymentsBySender(senderAddress);
+  if (existingPayment.length > 0) {
+    throw new Error('Sender has an incomplete payment');
+  }
+
+  // check by sender_did too
+  if (senderDid) {
+    // If sender has transfer payments, return error
+    const existingPayment = await getTransferPaymentsBySenderDid(senderDid);
+    if (existingPayment.length > 0) {
+      throw new Error('Sender has an incomplete payment');
+    }
+  }
+
   try {
-    // 使用事务确保数据库操作的原子性
+    // Use transaction to ensure DB operations atomicity including address allocation
     const result = await withTransaction(async (client) => {
-      // 1. 获取可用的平台地址（在事务中）
+      // clean up existing prepare payments
+      const cancelledPayments = await updatePaymentFromPrepareToCancelBySenderWithTransaction(client, senderAddress);
+      for (const payment of cancelledPayments) {
+        console.log(`Cancelled prepare payment ${payment.id} for sender ${senderAddress}`);
+        // Release platform address
+        await releasePlatformAddressWithTransaction(client, payment.platform_address_index);
+        // update account status to cancel
+        await updateAccountStatusFromPrepareToCancelWithTransaction(client, payment.id);
+      }
+
+      // clean up existing prepare payments by sender_did too
+      if (senderDid) {
+        const cancelledPayments = await updatePaymentFromPrepareToCancelBySenderDidWithTransaction(client, senderDid);
+        for (const payment of cancelledPayments) {
+          console.log(`Cancelled prepare payment ${payment.id} for sender ${senderDid}`);
+          // Release platform address
+          await releasePlatformAddressWithTransaction(client, payment.platform_address_index);
+          // update account status to cancel
+          await updateAccountStatusFromPrepareToCancelWithTransaction(client, payment.id);
+        }
+      }
+
+      // Get available platform address within transaction (will rollback on error)
       const platformAddressRecord = await getAvailablePlatformAddressWithTransaction(client);
       if (!platformAddressRecord) {
         console.error('No available platform address found');
         throw new Error('No available platform address');
       }
 
+      // Build 2-2 transaction
       const platformAddress = platformAddressRecord.address;
-
-      // 2. 计算分账比例
-      const totalSplitRate = splitReceivers ? splitReceivers.reduce((sum: number, item: { splitRate: number; }) => sum + item.splitRate, 0) : 0;
-      const receiverSplitRate = 100 - totalSplitRate;
-
-      // 3. 构建交易（非数据库操作，可以在事务外执行，但为了原子性放在这里）
       const { rawTx, txHash } = await build2to2Transaction(
         senderAddress,
         platformAddress,
         BigInt(amount)
       );
 
-      // 4. 创建支付记录
+      // Calculate split ratio
+      const totalSplitRate = splitReceivers ? splitReceivers.reduce((sum: number, item: { splitRate: number; }) => sum + item.splitRate, 0) : 0;
+      const receiverSplitRate = 100 - totalSplitRate;
+
+      // Create payment record
       const payment = await createPaymentWithTransaction(
         client,
         senderAddress,
         receiverAddress,
         platformAddressRecord.index,
         amount,
-        info
+        info,
+        txHash,
+        senderDid,
+        receiverDid,
+        category
       );
 
-      // 5. 创建分账记录
-      for (const receiver of splitReceivers) {
-        const splitAmount = Math.floor(amount * receiver.splitRate / 100);
-        await createAccountWithTransaction(client, payment.id, receiver.address, splitAmount, info);
+      // Create split receiver account records
+      for (const splitReceiver of splitReceivers) {
+        const splitAmount = Math.floor(amount * splitReceiver.splitRate / 100);
+        await createAccountWithTransaction(client, payment.id, senderAddress, senderDid, splitReceiver.address, splitReceiver.receiverDid, splitAmount, info, '', category ?? 0);
       }
 
+      // Create receiver account record
       await createAccountWithTransaction(
         client, 
         payment.id, 
+        senderAddress, 
+        senderDid,
         receiverAddress, 
+        receiverDid,
         Math.floor(amount * receiverSplitRate / 100),
-        info
+        info,
+        '',
+        category ?? 0
       );
 
       return {
@@ -75,7 +130,6 @@ export async function preparePayment(
 
     return result;
   } catch (error) {
-    // 错误已经在事务中处理，数据库操作会自动回滚
     if (error instanceof Error) {
       console.error('Error preparing payment:', error.message);
     }
@@ -83,31 +137,31 @@ export async function preparePayment(
   }
 }
 
-// 完成转账
-export async function completeTransfer(paymentId: number, signedTx: any) {
-  try {
-    // 检查支付记录是否存在
-    const payment = await getPaymentById(paymentId);
-    if (!payment || payment.is_complete) {
-      console.error(`Payment with ID ${paymentId} not found or already completed`);
-      throw new Error('Payment not found or already completed');
-    }
+// Complete transfer
+export async function completeTransfer(paymentId: number, partSignedTx: string) {
+  // Update payment status to transfer
+  const payment = await updatePaymentStatusFromPrepareToTransfer(paymentId);
+  if (!payment) {
+    // Payment exists but not in expected state (prepare)
+    throw new Error('Payment not in prepare');
+  }
 
-    // 发送交易到链上
-    const txHash = await sendTransaction(signedTx);
-    
-    // 更新支付状态
-    await updatePaymentStatus(paymentId, txHash);
-    
-    return {
-      paymentId,
-      txHash,
-      status: 'completed'
-    };
+  console.log('completeTransfer payment:', payment);
+
+  let txHash = "";
+  try {
+    // Complete transaction and send to chain
+    txHash = await completeTransaction(payment.platform_address_index, partSignedTx, payment.tx_hash!);
   } catch (error) {
-    if (error instanceof Error) {
-      console.error('Error completing transfer:', error.message);
-    }
+    // Rollback payment status to prepare
+    await updatePaymentStatusFromTransferToPrepare(paymentId);
+    console.error('Error completing transaction:', error);
     throw error;
   }
+
+  return {
+    paymentId,
+    txHash,
+    status: 'completed'
+  };
 }

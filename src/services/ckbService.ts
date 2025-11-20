@@ -1,67 +1,65 @@
-import { ccc, hexFrom, Transaction, WitnessArgs } from "@ckb-ccc/core";
+import { Address, ccc, CellDepLike, hexFrom, KnownScript, Transaction } from "@ckb-ccc/core";
 import { HDKey } from "@scure/bip32";
 import * as bip39 from "@scure/bip39";
 import { wordlist } from '@scure/bip39/wordlists/english.js';
-import { createPlatformAddress, getAllPlatformAddress, PlatformAddress } from "../models/platformAddress";
+import { createPlatformAddress, getAllPlatformAddress } from "../models/platformAddress";
 import dotenv from 'dotenv';
 
-// 加载环境变量
+// load environment variables
 dotenv.config();
 
-// 平台配置
-const MIN_WITHDRAWAL_AMOUNT = BigInt(65 * 10**8); // 65 CKB in shannons
-// 提供一个默认的测试助记词，仅用于开发环境
-const PLATFORM_MNEMONIC = process.env.PLATFORM_MNEMONIC || 'calm gown solid jaguar card web paper loan scale sister rebel syrup';
-const CKB_NODE_URL = process.env.CKB_NODE_URL || 'https://testnet.ckb.dev/rpc';
+// Platform configuration
+export const MIN_WITHDRAWAL_AMOUNT = BigInt(65 * 10**8); // 65 CKB in shannons
+// Transfer fee in shannons
+export const TRANSFER_FEE = process.env.TRANSFER_FEE ? BigInt(process.env.TRANSFER_FEE) : BigInt(10000);
+
+const PLATFORM_MNEMONIC = process.env.PLATFORM_MNEMONIC;
 const CKB_NETWORK = process.env.CKB_NETWORK || 'ckb_testnet';
 
-// 生成多个平台地址
-const PLATFORM_ADDRESS_COUNT = 10;
+// Generate multiple platform addresses
+const PLATFORM_ADDRESS_COUNT = Number(process.env.PLATFORM_ADDRESS_COUNT || 2);
 const platformAddresses: string[] = [];
-
-// 导入数据库查询函数
-import { query } from '../db';
 
 // CKB client
 const cccClient = CKB_NETWORK === 'ckb_testnet' ? new ccc.ClientPublicTestnet() : new ccc.ClientPublicMainnet();
 
-// 初始化平台地址
+// Initialize platform addresses
 export async function initPlatformAddresses() { 
-  // 检查数据库中是否已有平台地址
-  const existingAddresses = await getAllPlatformAddress();
-  if (existingAddresses.length > 0) {
-    console.log(`Found ${existingAddresses.length} platform addresses in database`);
-    
-    // 加载地址到内存
-    const dbAddresses = await query('SELECT address, index FROM platform_address', []);
-    for (const row of dbAddresses.rows) {
-      platformAddresses.push(row.address);
-    }
-    return;
-  }
-
   if (!PLATFORM_MNEMONIC) {
     throw new Error('PLATFORM_MNEMONIC is not set');
   }
+  // get all platform addresses from database
+  const existingAddresses = await getAllPlatformAddress();
+  
+  console.log(`Found ${existingAddresses.length} platform addresses in database`);
+  
+  // add existing addresses to platformAddresses
+  for (const addr of existingAddresses) {
+    platformAddresses.push(addr.address);
+  }
+
+  if (existingAddresses.length >= PLATFORM_ADDRESS_COUNT) {
+    return;
+  }
+
   if (!bip39.validateMnemonic(PLATFORM_MNEMONIC, wordlist)) {
     throw new Error('PLATFORM_MNEMONIC is invalid');
   }
   const seed = await bip39.mnemonicToSeed(PLATFORM_MNEMONIC);
   const hdKey = HDKey.fromMasterSeed(seed);
   
-  // 生成多个平台地址并存入数据库
-  for (let i = 0; i < PLATFORM_ADDRESS_COUNT; i++) {
+  // Generate and store platform addresses
+  for (let i = existingAddresses.length; i < PLATFORM_ADDRESS_COUNT; i++) {
     const path = `m/44'/309'/0'/0/${i}`;
     const derivedKey = hdKey.derive(path);
     const publicKey = derivedKey.publicKey!;
-    const privateKey = derivedKey.privateKey!;
     const address = await new ccc.SignerCkbPublicKey(
             cccClient,
             publicKey,
           ).getRecommendedAddress();
     console.log(`Path: ${path}, Address: ${address}`);
     
-    // 存入数据库
+    // Store address in database
     await createPlatformAddress(address, i);
     
     platformAddresses.push(address);
@@ -70,69 +68,147 @@ export async function initPlatformAddresses() {
   console.log(`Initialized ${platformAddresses.length} platform addresses`);
 }
 
-export async function getPrivateKey(index: number): Promise<Buffer> {
+async function getPrivateKey(index: number): Promise<string> {
   if (!PLATFORM_MNEMONIC) {
     throw new Error('PLATFORM_MNEMONIC is not set');
   }
   if (!bip39.validateMnemonic(PLATFORM_MNEMONIC, wordlist)) {
     throw new Error('PLATFORM_MNEMONIC is invalid');
   }
+
+  if (index < 0 || index >= PLATFORM_ADDRESS_COUNT) {
+    throw new Error('Invalid platform address index');
+  }
+
   const seed = await bip39.mnemonicToSeed(PLATFORM_MNEMONIC);
   const hdKey = HDKey.fromMasterSeed(seed);
 
   const path = `m/44'/309'/0'/0/${index}`;
   const derivedKey = hdKey.derive(path);
-  return Buffer.from(derivedKey.privateKey!);
+  return hexFrom(derivedKey.privateKey!);
 }
 
-// 构建2-2交易
+export async function getAddressBalance(ckbAddress: string): Promise<bigint> {
+  const addr = await Address.fromString(ckbAddress, cccClient);
+  const balance = await cccClient.getBalance([addr.script]);
+  return balance;
+}
+
+// build 2-2 transaction
 export async function build2to2Transaction(
   senderAddress: string,
   platformAddress: string,
   amount: bigint
 ) {
   try {
-    // Mock实现，返回模拟的交易数据
-    console.log(`Mock: 构建2-2交易 - 发送方: ${senderAddress}, 平台地址: ${platformAddress}, 金额: ${amount}`);
+    // clean client cache
+    await cccClient.cache.clear();
+
+    const senderAddr = await Address.fromString(senderAddress, cccClient);
+    const platformAddr = await Address.fromString(platformAddress, cccClient);
+
+    const senderSigner = new ccc.SignerCkbScriptReadonly(
+      cccClient,
+      senderAddr.script
+    );
+
+    const platformSigner = new ccc.SignerCkbScriptReadonly(
+      cccClient,
+      platformAddr.script
+    );
+
+    // fixed fee
+    const fee = TRANSFER_FEE;
+
+    // Select suitable cells as transaction inputs
+    let sendSum = BigInt(0);
+    const senderCells = [];
+    for await (const cell of senderSigner.findCells(
+      {
+        scriptLenRange: [0, 1],
+        outputDataLenRange: [0, 1],
+      }, false, "asc", 10
+    )) {
+      sendSum += BigInt(cell.cellOutput.capacity);
+      senderCells.push(cell);
+      if (sendSum >= amount + MIN_WITHDRAWAL_AMOUNT + fee) {
+        break;
+      }
+    }
+
+    if (sendSum < amount + MIN_WITHDRAWAL_AMOUNT) {
+      throw new Error('Sender does not have enough balance');
+    }
+
+    // Each platform address only has one cell
+    const platformCells = [];
+    let platformSum = BigInt(0);
+    for await (const cell of platformSigner.findCells(
+      {},
+      false,
+      "asc",
+      2,
+    )) {
+      platformSum = platformSum + BigInt(cell.cellOutput.capacity);
+      platformCells.push(cell);
+      break;
+    }
+
+    if (platformCells.length === 0) {
+      throw new Error('Platform cell not found');
+    }
+
+    const inputCells = [...senderCells, ...platformCells];
+    const inputs = inputCells.map((cell) => ({
+      previousOutput: cell.outPoint,
+      since: "0x0",
+    }));
+
+    // Collect all lock codehashes and remove duplicates
+    const lockCodeHashes = new Set(inputCells.map((cell) => cell.cellOutput.lock.codeHash));
+    // Collect all cell dependencies
+    const cellDeps: CellDepLike[] = [];
+    for (const codeHash of lockCodeHashes) {
+      Object.entries(cccClient.scripts).forEach(([key, value]) => {
+        if (!value) {
+          return;
+        }
+        if (value.codeHash === codeHash) {
+          // [{"cellDep":{"outPoint":{"txHash":"0xf8de3bb47d055cdf460d93a2a6e1b05f7432f9777c8c474abf4eec1d4aee5d37","index":0},"depType":"depGroup"}}]
+          value.cellDeps.forEach((cellDepRecord) => {
+            cellDeps.push(cellDepRecord["cellDep"]);
+          });
+        }
+      });
+    }
+
+    const outputs = [
+      {
+        capacity: `${platformSum + amount}`,
+        lock: platformAddr.script,
+      },
+      {
+        capacity: `${sendSum - amount - fee}`,
+        lock: senderAddr.script,
+      },
+    ];
+
+    const tx = Transaction.from({
+      version: 0,
+      cellDeps: cellDeps,
+      inputs: inputs,
+      outputs: outputs,
+      outputsData: [],
+    });
+
+    // prepare witnesses
+    await tx.prepareSighashAllWitness(senderAddr.script, 85, cccClient);
+    await tx.prepareSighashAllWitness(platformAddr.script, 85, cccClient);
+
+    const rawTx = ccc.stringify(tx);
+    console.log('Raw transaction:', rawTx);
     
-    // 模拟交易结构
-    const rawTx = {
-      version: '0x0',
-      cellDeps: [
-        {
-          outPoint: {
-            txHash: '0x71a7ba8fc96349fea0ed3a5c47992e3b4084b031a42264a018e0072e8172e46c',
-            index: '0x0'
-          },
-          depType: 'depGroup'
-        }
-      ],
-      headerDeps: [],
-      inputs: [
-        {
-          previousOutput: {
-            txHash: '0x29ed7c9b1f0684c3b5789d85e89d8f59c6531bf386d7eb2918eed0d93ceaf7e9',
-            index: '0x0'
-          },
-          since: '0x0'
-        }
-      ],
-      outputs: [
-        {
-          capacity: `0x${amount.toString(16)}`,
-          lock: {
-            codeHash: '0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8',
-            args: '0x8211f1b938a107cd53b6302cc752a6fc3965638d',
-            hashType: 'type'
-          },
-          type: null
-        }
-      ],
-      outputsData: ['0x'],
-      witnesses: ['0x']
-    };
-    
-    const txHash = '0x' + Buffer.from(`mock_tx_hash_${Date.now()}`).toString('hex');
+    const txHash = tx.hash();
     
     return {
       rawTx,
@@ -144,22 +220,139 @@ export async function build2to2Transaction(
   }
 }
 
-// 发送交易到链上
-export async function sendTransaction(signedTx: any): Promise<string> {
-  // Mock实现，模拟发送交易
-  console.log('Mock: 发送交易到链上', JSON.stringify(signedTx).substring(0, 100) + '...');
-  
-  // 模拟交易哈希
-  const txHash = '0x' + Buffer.from(`mock_tx_hash_sent_${Date.now()}`).toString('hex');
-  
-  return txHash;
+export async function completeTransaction(platformAddressIndex: number, partSignedTx: string, prepareTxHash: string) {
+  try {
+    const txObj = JSON.parse(partSignedTx);
+
+    const tx = Transaction.from(txObj);
+
+    // Check transaction hash
+    if (tx.hash() !== prepareTxHash) {
+      throw new Error('Transaction hash mismatch');
+    }
+
+    const platformPrivateKey = await getPrivateKey(platformAddressIndex);
+    const platformSigner = new ccc.SignerCkbPrivateKey(cccClient, platformPrivateKey);
+
+    const signedTx = await platformSigner.signTransaction(tx);
+    console.log('signedTx:', signedTx);
+
+    const txHash = await cccClient.sendTransaction(signedTx);
+    
+    return txHash;
+  } catch (error) {
+    if (error instanceof Error) {
+      console.error('Error completing transfer:', error.message);
+    }
+    throw error;
+  }
 }
 
-// 检查交易状态
-export async function checkTransactionStatus(txHash: string): Promise<boolean> {
-  // Mock实现，模拟检查交易状态
-  console.log(`Mock: 检查交易状态 - 交易哈希: ${txHash}`);
-  
-  // 模拟交易已确认
-  return true;
+// check transaction status
+//export type TransactionStatus =
+//  | "sent"
+//  | "pending"
+//  | "proposed"
+//  | "committed"
+//  | "unknown"
+//  | "rejected";
+export async function getTransactionStatus(txHash: string): Promise<string | undefined> {
+  try {
+    const txStatus = await cccClient.getTransaction(txHash);
+    return txStatus?.status;
+  } catch (error) {
+    console.error('Error checking transaction status:', error);
+    throw error;
+  }
+}
+
+export async function AccountingTransaction(
+  receiverAddress: string,
+  platformAddressIndexes: number[],
+  totalAccountingAmount: bigint,
+  platformAmount: bigint
+) {
+  try {
+    const receiverAddr = await Address.fromString(receiverAddress, cccClient);
+    const receiverScript = receiverAddr.script;
+
+    // collect inputs and platform outputs
+    const inputs = [];
+    const outputs = [];
+    for (const index of platformAddressIndexes) {
+      const platformAddr = await Address.fromString(platformAddresses[index], cccClient);
+      const platformScript = platformAddr.script;
+      const platformSigner = new ccc.SignerCkbScriptReadonly(
+        cccClient,
+        platformScript
+      );
+      for await (const cell of platformSigner.findCells(
+        {},
+        false,
+        "asc",
+        10,
+      )) {
+        inputs.push({
+          previousOutput: cell.outPoint,
+          since: "0x0",
+        });
+      }
+      outputs.push({
+        capacity: MIN_WITHDRAWAL_AMOUNT,
+        lock: platformScript,
+      });
+    }
+
+    // append receiver output
+    outputs.push({
+      capacity: totalAccountingAmount,
+      lock: receiverScript,
+    });
+
+    // deal change
+    const fee = TRANSFER_FEE;
+    // platform provide fee
+    const change = platformAmount - totalAccountingAmount - fee;
+    outputs[0].capacity += change;
+
+    let tx = Transaction.from({
+      version: 0,
+      cellDeps: [],
+      inputs: inputs,
+      outputs: outputs,
+      outputsData: [],
+    });
+
+    // platform addresses are all secp256k1
+    tx.addCellDepsOfKnownScripts(cccClient, KnownScript.Secp256k1Blake160);
+
+    // sign accounting transaction
+    for (const index of platformAddressIndexes) {
+      const platformPrivateKey = await getPrivateKey(index);
+      const platformSigner = new ccc.SignerCkbPrivateKey(cccClient, platformPrivateKey);
+      tx = await platformSigner.signTransaction(tx);
+    }
+
+    const rawTx = ccc.stringify(tx);
+    console.log('Accounting transaction:', rawTx);
+
+    const txHash = tx.hash();
+    return {
+      tx,
+      txHash
+    };
+  } catch (error) {
+    console.error('Error building accounting transaction:', error);
+    throw error;
+  }
+}
+
+export async function sendCkbTransaction(tx: Transaction) {
+  try {
+    const txHash = await cccClient.sendTransaction(tx);
+    return txHash;
+  } catch (error) {
+    console.error('Error sending transaction:', error);
+    throw error;
+  }
 }

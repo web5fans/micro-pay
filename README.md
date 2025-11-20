@@ -12,7 +12,7 @@
 
 但是因为接收者也需要参与构造交易，且需要为 input cell 提供签名，所以双方必须同时在线。
 
-ACP（https://github.com/nervosnetwork/rfcs/blob/master/rfcs/0026-anyone-can-pay/0026-anyone-can-pay.md）方案在2-2方案的基础上对lock script 进行了修改，使得接收者的 input cell 无需签名，解决了接收者必须在线的问题。
+(ACP)[https://github.com/nervosnetwork/rfcs/blob/master/rfcs/0026-anyone-can-pay/0026-anyone-can-pay.md] 方案在2-2方案的基础上对lock script 进行了修改，使得接收者的 input cell 无需签名，解决了接收者必须在线的问题。
 
 但是 ACP 因为新增加了 lock script，所以需要生态支持，以及其他一些问题，目前使用并不多。
 
@@ -38,6 +38,8 @@ ACP（https://github.com/nervosnetwork/rfcs/blob/master/rfcs/0026-anyone-can-pay
 
 为了应对并发，平台配置一个助记词，通过该助记词派生出多个地址。
 
+助记词及推导出的地址可以使用 https://app.ckbccc.com/utils/Mnemonic 来生成。
+
 例如对于示例配置，平台会派生出 10 个地址。
 
 ```
@@ -53,7 +55,9 @@ Path: m/44'/309'/0'/0/8, Address: ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0v
 Path: m/44'/309'/0'/0/9, Address: ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqdczyxt5nz6d2s95vel3msrntd8hslxucgx2czac
 ```
 
-每个地址上只有一个 live cell，初始该 cell 的金额为 min_withdrawal_amount 。
+每个地址上只有一个 live cell，初始该 cell 的金额为 min_withdrawal_amount（65 CKB）。
+
+可以考虑额外多存 5 CKB 用作手续费，目前的实现中，分账交易的手续费是平台承担的。
 
 每个请求来了之后，从多个地址中挑选一个使用，并进行标记，防止重复使用。
 
@@ -62,7 +66,8 @@ CREATE TABLE IF NOT EXISTS platform_address(
     id INTEGER PRIMARY KEY,
     index INTEGER,
     is_used BOOLEAN,
-    created_at TIMESTAMP
+    created_at TIMESTAMP,
+    updated_at TIMESTAMP
 );
 ```
 
@@ -76,11 +81,14 @@ CREATE TABLE IF NOT EXISTS platform_address(
 CREATE TABLE IF NOT EXISTS payment(
     id BIGINT PRIMARY KEY,
     sender TEXT,
+    sender_did TEXT,    // identity multi sender point to same person
     receiver TEXT,
+    receiver_did TEXT,    // identity multi receiver point to same person
     platform_address_index INTEGER,
     amount BIGINT,
     info TEXT,
-    is_complete BOOLEAN,
+    category INTEGER, // default 0, app define other category
+    status INTEGER, // 0: prepare, 1: transfer, 2: complete, 3: cancel
     tx_hash TEXT,
     created_at TIMESTAMP,
     updated_at TIMESTAMP,
@@ -97,10 +105,15 @@ CREATE TABLE IF NOT EXISTS payment(
 CREATE TABLE IF NOT EXISTS account(
     id BIGINT PRIMARY KEY,
     payment_id BIGINT,
+    sender TEXT,
+    sender_did TEXT,    // identity multi sender point to same person
     receiver TEXT,
+    receiver_did TEXT,    // identity multi receiver point to same person
+    platform_address_indexes TEXT,
     amount BIGINT,
     info TEXT,
-    is_payed BOOLEAN,
+    category INTEGER, // default 0, app define other category
+    status INTEGER, // 0: prepare, 1: (payment) complete, 2: cancel, 3: accounting, 4: accounted
     tx_hash TEXT,
     created_at TIMESTAMP,
     updated_at TIMESTAMP,
@@ -118,7 +131,7 @@ CREATE TABLE IF NOT EXISTS account(
 平台需要提供 2 个 API 接口，用于发送者发送转账请求。
 
 - 转账准备接口。
-  发送者调用该接口，请求包含发送者地址，接收者地址，转账金额和一个包含分账者地址及分账百分比的数组，以及一个可选的 info 字段。
+  发送者调用该接口，请求包含发送者地址，接收者地址，转账金额和一个包含分账者地址及分账百分比的数组等字段。
   平台首先根据发送者地址，和从多个平台地址中挑选一个未使用的地址，以及转账金额组装 2-2 支付交易。
   记录支付信息并得到一个支付 id，记录接收者和分账者的分账信息。
   返回包含支付 id，未签名的2-2 交易的 raw tx，以及 2-2 交易的 hash。
@@ -130,22 +143,66 @@ CREATE TABLE IF NOT EXISTS account(
 
 查询交易记录接口包括：
 
-- 根据支付 id 查询支付记录，包含支付者地址，接收者地址，转账金额，info, 交易 hash，交易状态等以及分账记录。
-- 根据发送者地址查询支付记录，包含支付 id，接收者地址，转账金额, info, 交易 hash，交易状态。
-- 根据接收者地址查询分账记录，包含分账id，支付 id，接收者地址，金额, info, 交易 hash，是否支付。
+- 根据支付 id 查询支付记录，包含支付者地址，接收者地址，转账金额，info, 交易 hash，交易状态等以及分账记录等。
+- 根据发送者地址查询支付记录（分页），包含支付 id，接收者地址，转账金额, info, 交易 hash，交易状态等。
+- 根据接收者地址查询分账记录（分页），包含分账id，支付 id，接收者地址，金额, info, 交易 hash，是否支付等。
+- 根据发送者DID查询支付记录（分页），包含支付 id，接收者地址，转账金额, info, 交易 hash，交易状态等。
+- 根据接收者DID查询分账记录（分页），包含分账id，支付 id，接收者地址，金额, info, 交易 hash，是否支付等。
+- 根据info查询已经完成的支付记录（分页），包含支付 id，发送者地址，接收者地址，转账金额, info, 交易 hash，交易状态等。
+- 根据info查询已经完成的支付记录的总金额。
+- 根据DID查询统计信息。包括该DID最近一个月的支出和总支出；最近一个月的收入和总收入。
+
+
+### 超时处理
+
+后台定期查询所有未完成的支付记录，检查是否超过指定时间（例如 1 分钟）。
+
+如果发送者在调用转账准备接口之后在指定时间内（例如 1 分钟）没有调用转账接口，平台会将交易视为超时，将对应的支付记录及相关的分账记录设置为 cancel 状态，并释放对应的平台地址。
 
 ## 运行
 
-1. 安装依赖
+1. 环境变量
+
+参见示例 `.env` 文件。
+
+环境变量：
+- DB_HOST：数据库主机地址，默认值 `localhost`
+- DB_PORT：数据库端口号，默认值 `5432`
+- DB_USER：数据库用户名，默认值 `postgres`
+- DB_PASSWORD：数据库密码，默认值 `123456`
+- DB_NAME：数据库名称，默认值 `postgres`
+- PORT：服务端口号，默认值 `3000`
+- PLATFORM_MNEMONIC：平台助记词，无默认值，必须用户设置。例如 `calm gown solid jaguar card web paper loan scale sister rebel syrup`
+- PLATFORM_ADDRESS_COUNT：平台地址数量，默认值 `2`
+- CKB_NETWORK：CKB 网络，默认值 `ckb_testnet`，可选值 `ckb_testnet` 或者 `ckb`
+- TRANSFER_FEE：转账手续费，单位是 shannons，默认值 `10000`
+- ACCOUNT_CHECK_INTERVAL：分账检查间隔，单位是秒，默认值 `14400`
+
+2. 安装依赖
 ```
 npm install
 ```
 
-2. 运行服务
+3. 运行服务
 ```
 bash dev_db.sh
 npm start
 ```
+
+## API 文档与错误码
+
+详见 `docs/API.md` 获取完整的接口说明、请求校验、错误码与示例响应。
+
+错误码快速参考：
+
+- `DUPLICATE_ACTIVE_PAYMENT` (409) — 发送者存在活跃支付
+- `INCOMPLETE_PAYMENT_EXISTS` (409) — 检测到历史未完成支付
+- `INSUFFICIENT_BALANCE` (422) — 余额不足
+- `NO_PLATFORM_ADDRESS` (503) — 平台地址池枯竭
+- `STATE_MISMATCH` (409) — 支付状态不匹配（非 prepare）
+- `CHAIN_ERROR` (502) — 链上/外部服务错误
+- `VALIDATION_ERROR` (400) — 请求参数校验失败
+- `INTERNAL_ERROR` (500) — 内部未知错误
 
 ## 接口测试
 
@@ -160,184 +217,347 @@ OK
 
 2. 转账准备接口
 ```
-curl -X POST http://localhost:3000/api/payment/prepare \
+curl -s -X POST http://localhost:3000/api/payment/prepare \
   -H "Content-Type: application/json" \
   -d '{
-    "sender": "ckb_address_sender",
-    "receiver": "ckb_address_receiver",
-    "amount": 100000000,
+    "sender": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqwu8lmjcalepgp5k6d4j0mtxwww68v9m6qz0q8ah",
+    "senderDid": "did:ckb:sender",
+    "receiver": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqttz30qvq8rlht9r9wc6lqu27x6ykx5eyskhysra",
+    "receiverDid": "did:ckb:receiver",
+    "amount": 5000000000,
     "splitReceivers": [
       {
-        "address": "ckb_address_split1",
+        "address": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsq0stn7whuvhjc2gm0frkjrg80wqac7xvlqf5qh7w",
+        "receiverDid": "did:ckb:spliter1",
         "splitRate": 10
       },
       {
-        "address": "ckb_address_split2",
+        "address": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqfj3fq244fc9r82gt5hcka9ertn46pwkmgtu7ced",
+        "receiverDid": "did:ckb:spliter2",
         "splitRate": 20
       }
     ],
     "info": "post_id"
-  }'
+  }' | jq .
 ```
 响应
 ```
 {
-    "paymentId": 1,
-    "rawTx": {
-        "version": "0x0",
-        "cellDeps": [
-            {
-                "outPoint": {
-                    "txHash": "0x71a7ba8fc96349fea0ed3a5c47992e3b4084b031a42264a018e0072e8172e46c",
-                    "index": "0x0"
-                },
-                "depType": "depGroup"
-            }
-        ],
-        "headerDeps": [],
-        "inputs": [
-            {
-                "previousOutput": {
-                    "txHash": "0x29ed7c9b1f0684c3b5789d85e89d8f59c6531bf386d7eb2918eed0d93ceaf7e9",
-                    "index": "0x0"
-                },
-                "since": "0x0"
-            }
-        ],
-        "outputs": [
-            {
-                "capacity": "0x5f5e100",
-                "lock": {
-                    "codeHash": "0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8",
-                    "args": "0x8211f1b938a107cd53b6302cc752a6fc3965638d",
-                    "hashType": "type"
-                },
-                "type": null
-            }
-        ],
-        "outputsData": [
-            "0x"
-        ],
-        "witnesses": [
-            "0x"
-        ]
-    },
-    "txHash": "0x6d6f636b5f74785f686173685f31373631383038393331373239"
+    "paymentId": 3,
+    "rawTx": "{\"version\":\"0x0\",\"cellDeps\":[{\"outPoint\":{\"txHash\":\"0xf8de3bb47d055cdf460d93a2a6e1b05f7432f9777c8c474abf4eec1d4aee5d37\",\"index\":\"0x0\"},\"depType\":\"depGroup\"}],\"headerDeps\":[],\"inputs\":[{\"previousOutput\":{\"txHash\":\"0x8904905ee742e3290aea1687a845a43e664b4154c1e90503e73795ee3da056c5\",\"index\":\"0x1\"},\"since\":\"0x0\",\"cellOutput\":{\"capacity\":\"0x33c211caf6\",\"lock\":{\"codeHash\":\"0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8\",\"hashType\":\"type\",\"args\":\"0xdc3ff72c77f90a034b69b593f6b339ced1d85de8\"}},\"outputData\":\"0x\"},{\"previousOutput\":{\"txHash\":\"0x1aa3b137e73e324f3e9e38e1ceb5c60285718fe0c06c8dc00a985fdc48f96f5b\",\"index\":\"0x0\"},\"since\":\"0x0\",\"cellOutput\":{\"capacity\":\"0x37e11d600\",\"lock\":{\"codeHash\":\"0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8\",\"hashType\":\"type\",\"args\":\"0xf1e5e5641a3810fefaccaae4076f91a5de444726\"}},\"outputData\":\"0x\"}],\"outputs\":[{\"capacity\":\"0x4a817c800\",\"lock\":{\"codeHash\":\"0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8\",\"hashType\":\"type\",\"args\":\"0xf1e5e5641a3810fefaccaae4076f91a5de444726\"}},{\"capacity\":\"0x32980bb1e6\",\"lock\":{\"codeHash\":\"0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8\",\"hashType\":\"type\",\"args\":\"0xdc3ff72c77f90a034b69b593f6b339ced1d85de8\"}}],\"outputsData\":[\"0x\",\"0x\"],\"witnesses\":[\"0x690000001000000069000000690000005500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\",\"0x690000001000000069000000690000005500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\"]}",
+    "txHash": "0xde69658e2e9dc1c9d5708219e8cb1251455a7d52835580946c8ee88877bd9ae2"
 }
 ```
 
 3. 转账接口
 ```
-curl -X POST http://localhost:3000/api/payment/transfer \
+curl -s -X POST http://localhost:3000/api/payment/transfer \
   -H "Content-Type: application/json" \
   -d '{
-    "payment_id": "1",
-    "signed_tx": "signed_transaction_hex_string"
-  }'
+    "paymentId": 5,
+    "signedTx": "{\"version\":\"0x0\",\"cellDeps\":[{\"outPoint\":{\"txHash\":\"0xf8de3bb47d055cdf460d93a2a6e1b05f7432f9777c8c474abf4eec1d4aee5d37\",\"index\":\"0x0\"},\"depType\":\"depGroup\"}],\"headerDeps\":[],\"inputs\":[{\"previousOutput\":{\"txHash\":\"0x154c91a133d8e82a7515c998cc5cba3cdf5838cd35bfa70f2860fb657a4ed641\",\"index\":\"0x1\"},\"since\":\"0x0\",\"cellOutput\":{\"capacity\":\"0x2deff374b6\",\"lock\":{\"codeHash\":\"0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8\",\"hashType\":\"type\",\"args\":\"0xdc3ff72c77f90a034b69b593f6b339ced1d85de8\"}},\"outputData\":\"0x\"},{\"previousOutput\":{\"txHash\":\"0x154c91a133d8e82a7515c998cc5cba3cdf5838cd35bfa70f2860fb657a4ed641\",\"index\":\"0x0\"},\"since\":\"0x0\",\"cellOutput\":{\"capacity\":\"0x8f6c76100\",\"lock\":{\"codeHash\":\"0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8\",\"hashType\":\"type\",\"args\":\"0xf1e5e5641a3810fefaccaae4076f91a5de444726\"}},\"outputData\":\"0x\"}],\"outputs\":[{\"capacity\":\"0xa20cd5300\",\"lock\":{\"codeHash\":\"0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8\",\"hashType\":\"type\",\"args\":\"0xf1e5e5641a3810fefaccaae4076f91a5de444726\"}},{\"capacity\":\"0x2cc5ed5ba6\",\"lock\":{\"codeHash\":\"0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8\",\"hashType\":\"type\",\"args\":\"0xdc3ff72c77f90a034b69b593f6b339ced1d85de8\"}}],\"outputsData\":[\"0x\",\"0x\"],\"witnesses\":[\"0x55000000100000005500000055000000410000005bee5cf44a83f35de7061e5b6ae5a9dd1c06b72bd28f57f22ad863db9e00de3e67a5c282591858c03a58f62bdc9a3e31db56d0aaf151263f457fcf98b73f317100\",\"0x690000001000000069000000690000005500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\"]}"
+  }' | jq .
 ```
 响应
 ```
 {
-    "paymentId": "1",
-    "txHash": "0x6d6f636b5f74785f686173685f73656e745f31373631383039303938353335",
+    "paymentId": 1,
+    "txHash": "0xde69658e2e9dc1c9d5708219e8cb1251455a7d52835580946c8ee88877bd9ae2",
     "status": "completed"
 }
 ```
 
 4. 根据支付id查询支付记录
 ```
-curl -X GET http://localhost:3000/api/payment/1
+curl -s -X GET http://localhost:3000/api/payment/id/1 | jq .
 ```
 响应
 ```
 {
-    "payment": {
-        "id": 1,
-        "sender": "ckb_address_sender",
-        "receiver": "ckb_address_receiver",
-        "amount": "100000000",
-        "info": "post_id",
-        "is_complete": true,
-        "tx_hash": "0x6d6f636b5f74785f686173685f73656e745f31373631383039303938353335",
-        "created_at": "2025-10-29T23:22:11.727Z",
-        "updated_at": "2025-10-29T23:24:58.535Z"
+  "payment": {
+    "id": 1,
+    "sender": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqwu8lmjcalepgp5k6d4j0mtxwww68v9m6qz0q8ah",
+    "receiver": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqttz30qvq8rlht9r9wc6lqu27x6ykx5eyskhysra",
+    "senderDid": "did:ckb:sender",
+    "receiverDid": "did:ckb:receiver",
+    "category": 0,
+    "amount": "5000000000",
+    "info": "post_id",
+    "status": 3,
+    "txHash": "0x8070973e4505ac92c9b4cb3e9927365fff3c1e164c942fcee604381cf0f73ba1",
+    "createdAt": "2025-11-11T22:26:34.376Z",
+    "updatedAt": "2025-11-11T22:26:35.638Z"
+  },
+  "accounts": [
+    {
+      "id": 1,
+      "paymentId": 1,
+      "receiver": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsq0stn7whuvhjc2gm0frkjrg80wqac7xvlqf5qh7w",
+      "receiverDid": "did:ckb:spliter1",
+      "category": 0,
+      "amount": "500000000",
+      "info": "post_id",
+      "status": 2,
+      "createdAt": "2025-11-11T22:26:34.376Z",
+      "updatedAt": "2025-11-11T22:26:35.638Z"
     },
-    "accounts": [
-        {
-            "id": 1,
-            "payment_id": 1,
-            "receiver": "ckb_address_split1",
-            "amount": "10000000",
-            "info": "post_id",
-            "is_payed": false,
-            "tx_hash": null,
-            "created_at": "2025-10-29T23:22:11.727Z",
-            "updated_at": "2025-10-29T23:22:11.727Z"
-        },
-        {
-            "id": 2,
-            "payment_id": 1,
-            "receiver": "ckb_address_split2",
-            "amount": "20000000",
-            "info": "post_id",
-            "is_payed": false,
-            "tx_hash": null,
-            "created_at": "2025-10-29T23:22:11.727Z",
-            "updated_at": "2025-10-29T23:22:11.727Z"
-        },
-        {
-            "id": 3,
-            "payment_id": 1,
-            "receiver": "ckb_address_receiver",
-            "amount": "70000000",
-            "info": "post_id",
-            "is_payed": false,
-            "tx_hash": null,
-            "created_at": "2025-10-29T23:22:11.727Z",
-            "updated_at": "2025-10-29T23:22:11.727Z"
-        }
-    ]
+    {
+      "id": 2,
+      "paymentId": 1,
+      "receiver": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqfj3fq244fc9r82gt5hcka9ertn46pwkmgtu7ced",
+      "receiverDid": "did:ckb:spliter2",
+      "category": 0,
+      "amount": "1000000000",
+      "info": "post_id",
+      "status": 2,
+      "createdAt": "2025-11-11T22:26:34.376Z",
+      "updatedAt": "2025-11-11T22:26:35.638Z"
+    },
+    {
+      "id": 3,
+      "paymentId": 1,
+      "receiver": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqttz30qvq8rlht9r9wc6lqu27x6ykx5eyskhysra",
+      "receiverDid": "did:ckb:receiver",
+      "category": 0,
+      "amount": "3500000000",
+      "info": "post_id",
+      "status": 2,
+      "createdAt": "2025-11-11T22:26:34.376Z",
+      "updatedAt": "2025-11-11T22:26:35.638Z"
+    }
+  ]
 }
 ``` 
 
 5. 根据发送者地址查询发送的支付记录
 ``` 
-curl -X GET http://localhost:3000/api/payment/sender/ckb_address_sender
+curl -s -X GET http://localhost:3000/api/payment/sender/ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqwu8lmjcalepgp5k6d4j0mtxwww68v9m6qz0q8ah | jq .
 ```
 响应
 ```
-[
+{
+  "items": [
     {
-        "id": 1,
-        "sender": "ckb_address_sender",
-        "receiver": "ckb_address_receiver",
-        "amount": "100000000",
-        "info": "post_id",
-        "is_complete": true,
-        "tx_hash": "0x6d6f636b5f74785f686173685f73656e745f31373631383039303938353335",
-        "created_at": "2025-10-29T23:22:11.727Z",
-        "updated_at": "2025-10-29T23:24:58.535Z"
+      "id": 2,
+      "sender": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqwu8lmjcalepgp5k6d4j0mtxwww68v9m6qz0q8ah",
+      "receiver": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqttz30qvq8rlht9r9wc6lqu27x6ykx5eyskhysra",
+      "senderDid": "did:ckb:sender",
+      "receiverDid": "did:ckb:receiver",
+      "category": 0,
+      "amount": "5000000000",
+      "info": "post_id",
+      "status": 2,
+      "txHash": "0x8070973e4505ac92c9b4cb3e9927365fff3c1e164c942fcee604381cf0f73ba1",
+      "createdAt": "2025-11-11T22:26:35.638Z",
+      "updatedAt": "2025-11-11T22:27:20.744Z"
+    },
+    {
+      "id": 1,
+      "sender": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqwu8lmjcalepgp5k6d4j0mtxwww68v9m6qz0q8ah",
+      "receiver": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqttz30qvq8rlht9r9wc6lqu27x6ykx5eyskhysra",
+      "senderDid": "did:ckb:sender",
+      "receiverDid": "did:ckb:receiver",
+      "category": 0,
+      "amount": "5000000000",
+      "info": "post_id",
+      "status": 3,
+      "txHash": "0x8070973e4505ac92c9b4cb3e9927365fff3c1e164c942fcee604381cf0f73ba1",
+      "createdAt": "2025-11-11T22:26:34.376Z",
+      "updatedAt": "2025-11-11T22:26:35.638Z"
     }
-]
+  ],
+  "pagination": {
+    "limit": 20,
+    "offset": 0,
+    "count": 2
+  }
+}
 ``` 
 
 6. 根据接收者地址查询分账记录
 ``` 
-curl -X GET http://localhost:3000/api/payment/receiver/ckb_address_receiver
+curl -s -X GET http://localhost:3000/api/payment/receiver/ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqttz30qvq8rlht9r9wc6lqu27x6ykx5eyskhysra | jq .
 ```
 响应
 ```
-[
+{
+  "items": [
     {
-        "id": 3,
-        "payment_id": 1,
-        "receiver": "ckb_address_receiver",
-        "amount": "70000000",
-        "info": "post_id",
-        "is_payed": false,
-        "tx_hash": null,
-        "created_at": "2025-10-29T23:22:11.727Z",
-        "updated_at": "2025-10-29T23:22:11.727Z"
+      "id": 6,
+      "paymentId": 3,
+      "sender": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqwu8lmjcalepgp5k6d4j0mtxwww68v9m6qz0q8ah",
+      "senderDid": "did:ckb:sender",
+      "receiver": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqttz30qvq8rlht9r9wc6lqu27x6ykx5eyskhysra",
+      "receiverDid": "did:ckb:receiver",
+      "category": 0,
+      "amount": "3500000000",
+      "info": "post_id",
+      "status": 1,
+      "createdAt": "2025-11-13T00:44:17.927Z",
+      "updatedAt": "2025-11-13T00:44:46.717Z"
+    },
+    {
+      "id": 3,
+      "paymentId": 2,
+      "sender": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqwu8lmjcalepgp5k6d4j0mtxwww68v9m6qz0q8ah",
+      "senderDid": "did:ckb:sender",
+      "receiver": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqttz30qvq8rlht9r9wc6lqu27x6ykx5eyskhysra",
+      "receiverDid": "did:ckb:receiver",
+      "category": 0,
+      "amount": "3500000000",
+      "info": "post_id",
+      "status": 2,
+      "createdAt": "2025-11-13T00:44:16.813Z",
+      "updatedAt": "2025-11-13T00:44:17.927Z"
     }
-]
+  ],
+  "pagination": {
+    "limit": 20,
+    "offset": 0,
+    "count": 2
+  }
+}
 ``` 
+
+7. 根据senderDid查询支付记录(只包含status=1(transfer)和status=2(completed))
+``` 
+curl -s -G "http://localhost:3000/api/payment/sender-did/did:ckb:sender" --data-urlencode "start=2025-01-01T00:00:00Z" --data-urlencode "end=2025-12-31T23:59:59Z" --data "category=0" --data "limit=50" --data "offset=0" | jq .
+```
+响应
+```
+{
+  "items": [
+    {
+      "id": 3,
+      "sender": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqwu8lmjcalepgp5k6d4j0mtxwww68v9m6qz0q8ah",
+      "senderDid": "did:ckb:sender",
+      "receiver": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqttz30qvq8rlht9r9wc6lqu27x6ykx5eyskhysra",
+      "receiverDid": "did:ckb:receiver",
+      "category": 0,
+      "amount": "5000000000",
+      "info": "post_id",
+      "status": 2,
+      "txHash": "0xeb969fa75ec436ac46117cf0d651444e34d566cfe1897739e3b775461b7049f2",
+      "createdAt": "2025-11-13T00:44:17.927Z"
+    }
+  ],
+  "pagination": {
+    "limit": 50,
+    "offset": 0,
+    "count": 1
+  }
+}
+```
+
+8. 根据receiverDid查询收款记录,只包含status=1(payment completed),status=3(accounting)和status=4(accounted)
+``` 
+curl -s -G "http://localhost:3000/api/payment/receiver-did/did:ckb:receiver" --data-urlencode "start=2025-01-01T00:00:00Z" --data-urlencode "end=2025-12-31T23:59:59Z" --data "category=0" --data "limit=50" --data "offset=0" | jq .
+```
+响应
+```
+{
+  "items": [
+    {
+      "id": 6,
+      "paymentId": 3,
+      "sender": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqwu8lmjcalepgp5k6d4j0mtxwww68v9m6qz0q8ah",
+      "senderDid": "did:ckb:sender",
+      "receiver": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqttz30qvq8rlht9r9wc6lqu27x6ykx5eyskhysra",
+      "receiverDid": "did:ckb:receiver",
+      "category": 0,
+      "amount": "3500000000",
+      "info": "post_id",
+      "status": 1,
+      "txHash": null,
+      "createdAt": "2025-11-13T00:44:17.927Z"
+    }
+  ],
+  "pagination": {
+    "limit": 50,
+    "offset": 0,
+    "count": 1
+  }
+}
+```
+
+9. 根据info查询已完成（status=2）支付记录的总金额
+``` 
+curl -s "http://localhost:3000/api/payment/completed-total?info=post_id" | jq .
+```
+响应
+```
+{
+  "info": "post_id",
+  "total": 10000000000
+}
+```
+
+10. 根据info查询已完成（status=2）支付记录
+``` 
+curl -s "http://localhost:3000/api/payment/completed?info=post_id" | jq .
+```
+响应
+```
+{
+  "items": [
+    {
+      "id": 4,
+      "sender": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqwu8lmjcalepgp5k6d4j0mtxwww68v9m6qz0q8ah",
+      "senderDid": "did:ckb:sender",
+      "receiver": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqttz30qvq8rlht9r9wc6lqu27x6ykx5eyskhysra",
+      "receiverDid": "did:ckb:receiver",
+      "amount": "5000000000",
+      "info": "post_id",
+      "status": 2,
+      "txHash": "0x56ccbeadef0646a158d1a416690f05cb412c611488d87d36c8f8a012d021d9c0",
+      "category": 0,
+      "createdAt": "2025-11-11T23:09:39.913Z"
+    },
+    {
+      "id": 2,
+      "sender": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqwu8lmjcalepgp5k6d4j0mtxwww68v9m6qz0q8ah",
+      "senderDid": "did:ckb:sender",
+      "receiver": "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqttz30qvq8rlht9r9wc6lqu27x6ykx5eyskhysra",
+      "receiverDid": "did:ckb:receiver",
+      "amount": "5000000000",
+      "info": "post_id",
+      "status": 2,
+      "txHash": "0x731bb11011789f133d6989ad3e54ef2ccb05720947013f37d88d5c693274532c",
+      "category": 0,
+      "createdAt": "2025-11-11T23:07:59.197Z"
+    }
+  ],
+  "pagination": {
+    "limit": 20,
+    "offset": 0,
+    "count": 2
+  }
+}
+```
+
+11. 根据did查询统计信息
+``` 
+curl -s "http://localhost:3000/api/payment/did-stats/did:ckb:sender" | jq .
+```
+响应
+```
+{
+  "did": "did:ckb:sender",
+  "monthlyExpense": "10000000000",
+  "monthlyIncome": "0",
+  "totalExpense": "10000000000",
+  "totalIncome": "0"
+}
+```
+
+
+## TODO
+- [X] 事务保障需要完善
+  - [X] 数据库记录里的状态要细化，形成一个状态机
+  - [X] 清理的时候要改成幂等的方式
+- [X] transfer要等tx确认
+- [X] 平台账户数量要可增加
+- [X] 查询分页
+- [X] 后台分账
+- [X] 完善交易状态处理
+- [X] 完善交易记录查询

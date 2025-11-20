@@ -3,33 +3,53 @@ import { paymentRouter } from './api/payment';
 import { initDb } from './db';
 import dotenv from 'dotenv';
 import { initPlatformAddresses } from './services/ckbService';
+import { startPaymentCleanupTask } from './services/paymentCleanupService';
+import { startCkbTransactionCheckTask } from './services/ckbTransactionCheckService';
+import { startAccountCheckTask } from './services/accountService';
+import { initLogger } from './utils/logger';
 
-// 加载环境变量
+// Load environment variables
 dotenv.config();
 
-// 创建Express应用
+// Init logger (time-prefixed console output)
+initLogger();
+
+// Create Express application
 const app = express();
 const port = process.env.PORT || 3000;
+const accountCheckInterval = parseInt(process.env.ACCOUNT_CHECK_INTERVAL || '14400', 10);
 
-// 中间件
+// Middleware
 app.use(express.json());
 
-// 健康检查接口
+// Health check endpoint
 app.get('/health', (req, res) => {
   res.send('OK');
 });
 
-// 路由
+// Routes
 app.use('/api/payment', paymentRouter);
 
-// 启动服务器
+// Start server
 async function startServer() {
   try {
-    // 初始化数据库
+    // Initialize database
     await initDb();
     
-    // 初始化平台地址
+    // Initialize platform addresses
     await initPlatformAddresses();
+    
+    // Start periodic check for incomplete payment records
+    // Check every 30 seconds, payments incomplete for more than 60 seconds will be considered timeout
+    startPaymentCleanupTask(30, 60);
+
+    // Start periodic check ckb transaction status
+    // Check every 20 seconds, payments with status 'transfer' will be checked
+    startCkbTransactionCheckTask(20);
+
+    // Start periodic check account records
+    // Check every 4 * 60 * 60 seconds, account records with status 'transfer' will be checked
+    startAccountCheckTask(accountCheckInterval);
     
     app.listen(port, () => {
       console.log(`Server is running at http://localhost:${port}`);

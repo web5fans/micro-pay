@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    // 覆盖 include 范围以包含运行入口与测试目录
+    "rootDir": "."
+  },
+  "include": [
+    "src/**/*.ts",
+    "integration/**/*.ts",
+    "tests/**/*.ts"
+  ]
+}

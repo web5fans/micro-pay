@@ -1,24 +1,24 @@
 import { PoolClient } from 'pg';
 import { query } from '../db';
 
-export interface PlatformAddress {
+interface PlatformAddress {
   id: number;
   address: string;
   index: number;
   is_used: boolean;
   created_at: Date;
+  updated_at: Date;
 }
 
 export async function createPlatformAddress(
   address: string,
   index: number
 ): Promise<PlatformAddress> {
-  const timeNow = new Date().toISOString();
   const result = await query(
-    `INSERT INTO platform_address (address, index, is_used, created_at)
-     VALUES ($1, $2, $3, $4)
+    `INSERT INTO platform_address (address, index)
+     VALUES ($1, $2)
      RETURNING *`,
-    [address, index, false, timeNow]
+    [address, index]
   );
   
   return result.rows[0];
@@ -32,16 +32,26 @@ export async function getAllPlatformAddress(): Promise<PlatformAddress[]> {
   return result.rows || [];
 }
 
-// 获取一个可用的平台地址（支持事务）
-export async function getAvailablePlatformAddressWithTransaction(client: any) {
+// Get an available platform address (transaction supported)
+export async function getAvailablePlatformAddressWithTransaction(client: PoolClient) {
   try {
-    // 从数据库获取一个未使用的平台地址
+    // Get an unused platform address from database
     const result = await client.query(
-      'UPDATE platform_address SET is_used = true WHERE id = (SELECT id FROM platform_address WHERE is_used = false LIMIT 1) RETURNING index, address',
+      `WITH candidate AS (
+         SELECT id, index, address
+         FROM platform_address
+         WHERE is_used IS FALSE
+         ORDER BY id
+         LIMIT 1
+         FOR UPDATE SKIP LOCKED
+       )
+       UPDATE platform_address pa
+       SET is_used = true, updated_at = NOW()
+       FROM candidate c
+       WHERE pa.id = c.id
+       RETURNING c.index, c.address`,
       []
     );
-
-    console.log('getAvailablePlatformAddressWithTransaction result:', result);
     
     if (result.rows.length > 0) {
       const index = result.rows[0].index;
@@ -51,16 +61,28 @@ export async function getAvailablePlatformAddressWithTransaction(client: any) {
     return null;
   } catch (error) {
     console.error('Error getting available platform address:', error);
-    throw error; // 在事务中抛出错误以触发回滚
+    throw error; // Throw error in transaction to trigger rollback
   }
 }
 
-// 获取一个可用的平台地址（非事务版本，向后兼容）
+// Get an available platform address (non-transaction version, backward compatible)
 export async function getAvailablePlatformAddress() {
   try {
-    // 从数据库获取一个未使用的平台地址
+    // Get an unused platform address from database
     const result = await query(
-      'UPDATE platform_address SET is_used = true WHERE id = (SELECT id FROM platform_address WHERE is_used = false LIMIT 1) RETURNING index, address',
+      `WITH candidate AS (
+         SELECT id, index, address
+         FROM platform_address
+         WHERE is_used IS FALSE
+         ORDER BY id
+         LIMIT 1
+         FOR UPDATE SKIP LOCKED
+       )
+       UPDATE platform_address pa
+       SET is_used = true, updated_at = NOW()
+       FROM candidate c
+       WHERE pa.id = c.id
+       RETURNING c.index, c.address`,
       []
     );
     
@@ -76,12 +98,16 @@ export async function getAvailablePlatformAddress() {
   }
 }
 
-// 释放平台地址
-export async function releasePlatformAddress(index: number) {
+// Release platform address with transaction
+export async function releasePlatformAddressWithTransaction(
+  client: PoolClient,
+  index: number
+) {
   try {
-    await query('UPDATE platform_address SET is_used = false WHERE index = $1', [index]);
+    await client.query('UPDATE platform_address SET is_used = false, updated_at = NOW() WHERE index = $1', [index]);
     console.log(`Released platform address: ${index}`);  
   } catch (error) {
     console.error('Error releasing platform address:', error);
+    throw error; // Throw error in transaction to trigger rollback
   }
 }
