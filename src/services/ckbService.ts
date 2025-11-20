@@ -13,9 +13,7 @@ export const MIN_WITHDRAWAL_AMOUNT = BigInt(65 * 10**8); // 65 CKB in shannons
 // Transfer fee in shannons
 export const TRANSFER_FEE = process.env.TRANSFER_FEE ? BigInt(process.env.TRANSFER_FEE) : BigInt(10000);
 
-// Provide a default test mnemonic for development environment
-const PLATFORM_MNEMONIC = process.env.PLATFORM_MNEMONIC || 'calm gown solid jaguar card web paper loan scale sister rebel syrup';
-const CKB_NODE_URL = process.env.CKB_NODE_URL || 'https://testnet.ckb.dev/rpc';
+const PLATFORM_MNEMONIC = process.env.PLATFORM_MNEMONIC;
 const CKB_NETWORK = process.env.CKB_NETWORK || 'ckb_testnet';
 
 // Generate multiple platform addresses
@@ -27,6 +25,9 @@ const cccClient = CKB_NETWORK === 'ckb_testnet' ? new ccc.ClientPublicTestnet() 
 
 // Initialize platform addresses
 export async function initPlatformAddresses() { 
+  if (!PLATFORM_MNEMONIC) {
+    throw new Error('PLATFORM_MNEMONIC is not set');
+  }
   // get all platform addresses from database
   const existingAddresses = await getAllPlatformAddress();
   
@@ -41,9 +42,6 @@ export async function initPlatformAddresses() {
     return;
   }
 
-  if (!PLATFORM_MNEMONIC) {
-    throw new Error('PLATFORM_MNEMONIC is not set');
-  }
   if (!bip39.validateMnemonic(PLATFORM_MNEMONIC, wordlist)) {
     throw new Error('PLATFORM_MNEMONIC is invalid');
   }

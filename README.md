@@ -55,7 +55,9 @@ Path: m/44'/309'/0'/0/8, Address: ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0v
 Path: m/44'/309'/0'/0/9, Address: ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqdczyxt5nz6d2s95vel3msrntd8hslxucgx2czac
 ```
 
-每个地址上只有一个 live cell，初始该 cell 的金额为 min_withdrawal_amount（65 CKB） + 5 CKB （准备的手续费） 。
+每个地址上只有一个 live cell，初始该 cell 的金额为 min_withdrawal_amount（65 CKB）。
+
+可以考虑额外多存 5 CKB 用作手续费，目前的实现中，分账交易的手续费是平台承担的。
 
 每个请求来了之后，从多个地址中挑选一个使用，并进行标记，防止重复使用。
 
@@ -148,6 +150,7 @@ CREATE TABLE IF NOT EXISTS account(
 - 根据接收者DID查询分账记录（分页），包含分账id，支付 id，接收者地址，金额, info, 交易 hash，是否支付等。
 - 根据info查询已经完成的支付记录（分页），包含支付 id，发送者地址，接收者地址，转账金额, info, 交易 hash，交易状态等。
 - 根据info查询已经完成的支付记录的总金额。
+- 根据DID查询统计信息。包括该DID最近一个月的支出和总支出；最近一个月的收入和总收入。
 
 
 ### 超时处理
@@ -158,12 +161,29 @@ CREATE TABLE IF NOT EXISTS account(
 
 ## 运行
 
-1. 安装依赖
+1. 环境变量
+
+参见示例 `.env` 文件。
+
+环境变量：
+- DB_HOST：数据库主机地址，默认值 `localhost`
+- DB_PORT：数据库端口号，默认值 `5432`
+- DB_USER：数据库用户名，默认值 `postgres`
+- DB_PASSWORD：数据库密码，默认值 `123456`
+- DB_NAME：数据库名称，默认值 `postgres`
+- PORT：服务端口号，默认值 `3000`
+- PLATFORM_MNEMONIC：平台助记词，无默认值，必须用户设置。例如 `calm gown solid jaguar card web paper loan scale sister rebel syrup`
+- PLATFORM_ADDRESS_COUNT：平台地址数量，默认值 `2`
+- CKB_NETWORK：CKB 网络，默认值 `ckb_testnet`，可选值 `ckb_testnet` 或者 `ckb`
+- TRANSFER_FEE：转账手续费，单位是 shannons，默认值 `10000`
+- ACCOUNT_CHECK_INTERVAL：分账检查间隔，单位是秒，默认值 `14400`
+
+2. 安装依赖
 ```
 npm install
 ```
 
-2. 运行服务
+3. 运行服务
 ```
 bash dev_db.sh
 npm start
