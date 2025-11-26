@@ -220,16 +220,52 @@ export async function build2to2Transaction(
   }
 }
 
-export async function completeTransaction(platformAddressIndex: number, partSignedTx: string, prepareTxHash: string) {
+
+// payment transaction check
+// 1. no typescript
+// 2. platform address increment check
+export async function isPaymentTx(tx: Transaction, platformAddressIndex: number, amount: number): Promise<boolean> {
+  const platformAddress = platformAddresses[platformAddressIndex];
+  let platformAddressInputSum = BigInt(0);
+  let platformAddressOutputSum = BigInt(0);
+  try {
+    for (const input of tx.inputs) {
+      const cell = await cccClient.getCell(input.previousOutput);
+      if (!cell) {
+        throw new Error('Cell not found');
+      }
+      if (cell.cellOutput.type) {
+        throw new Error('Type script not supported');
+      }
+      const cellLock = cell.cellOutput.lock;
+      const cellAddress = await Address.fromScript(cellLock, cccClient);
+      if (cellAddress.toString() === platformAddress) {
+        platformAddressInputSum += BigInt(cell.cellOutput.capacity);
+      }
+    }
+
+    for (const output of tx.outputs) {
+      if (output.type) {
+        throw new Error('Type script not supported');
+      }
+      const outputAddress = await Address.fromScript(output.lock, cccClient);
+      if (outputAddress.toString() === platformAddress) {
+        platformAddressOutputSum += BigInt(output.capacity);
+      }
+    }
+
+    return platformAddressOutputSum >= platformAddressInputSum + BigInt(amount);
+  } catch (error) {
+    console.error('Error checking payment transaction:', error);
+    throw error;
+  }
+}
+
+export async function completeTransaction(platformAddressIndex: number, partSignedTx: string) {
   try {
     const txObj = JSON.parse(partSignedTx);
 
     const tx = Transaction.from(txObj);
-
-    // Check transaction hash
-    if (tx.hash() !== prepareTxHash) {
-      throw new Error('Transaction hash mismatch');
-    }
 
     const platformPrivateKey = await getPrivateKey(platformAddressIndex);
     const platformSigner = new ccc.SignerCkbPrivateKey(cccClient, platformPrivateKey);
@@ -238,8 +274,7 @@ export async function completeTransaction(platformAddressIndex: number, partSign
     console.log('signedTx:', signedTx);
 
     const txHash = await cccClient.sendTransaction(signedTx);
-    
-    return txHash;
+    console.log('sendTransaction txHash:', txHash);
   } catch (error) {
     if (error instanceof Error) {
       console.error('Error completing transfer:', error.message);

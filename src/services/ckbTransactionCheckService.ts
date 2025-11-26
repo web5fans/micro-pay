@@ -1,6 +1,6 @@
 import { withTransaction } from '../db';
 import { getAccountingAccounts, updateAccountStatusFromAccountingToAccountedByTransactionHashWithTransaction, updateAccountStatusFromAccountingToCompleteByTransactionHashWithTransaction, updateAccountStatusFromPrepareToCancelWithTransaction, updateAccountStatusFromPrepareToCompleteWithTransaction } from '../models/account';
-import { getTransferPayments, updatePaymentStatusFromTransferToCancelWithTransaction, updatePaymentStatusFromTransferToCompleteWithTransaction } from '../models/payment';
+import { getTransferPaymentsUpdateBefore10Seconds, updatePaymentStatusFromTransferToCancelWithTransaction, updatePaymentStatusFromTransferToCompleteWithTransaction } from '../models/payment';
 import { releasePlatformAddressWithTransaction } from '../models/platformAddress';
 import { getTransactionStatus } from './ckbService';
 
@@ -8,7 +8,7 @@ import { getTransactionStatus } from './ckbService';
 async function checkCkbTransactionStatus() {
   try {
     // check transfer payments
-    const transferPayments = await getTransferPayments();
+    const transferPayments = await getTransferPaymentsUpdateBefore10Seconds();
     console.log(`[CKB Transaction Check] Found ${transferPayments.length} transfer payments`);
     
     for (const payment of transferPayments) {

@@ -1,8 +1,9 @@
-import { createPaymentWithTransaction, getTransferPaymentsBySender, getTransferPaymentsBySenderDid, updatePaymentFromPrepareToCancelBySenderDidWithTransaction, updatePaymentFromPrepareToCancelBySenderWithTransaction, updatePaymentStatusFromPrepareToTransfer, updatePaymentStatusFromTransferToPrepare } from '../models/payment';
+import { createPaymentWithTransaction, getPaymentById, getTransferPaymentsBySender, getTransferPaymentsBySenderDid, updatePaymentFromPrepareToCancelBySenderDidWithTransaction, updatePaymentFromPrepareToCancelBySenderWithTransaction, updatePaymentStatusFromPrepareToTransfer, updatePaymentStatusFromTransferToPrepare } from '../models/payment';
 import { createAccountWithTransaction, updateAccountStatusFromPrepareToCancelWithTransaction } from '../models/account';
 import { getAvailablePlatformAddressWithTransaction, releasePlatformAddressWithTransaction } from '../models/platformAddress';
-import { build2to2Transaction, completeTransaction, getAddressBalance, MIN_WITHDRAWAL_AMOUNT } from './ckbService';
+import { build2to2Transaction, completeTransaction, getAddressBalance, isPaymentTx, MIN_WITHDRAWAL_AMOUNT } from './ckbService';
 import { withTransaction } from '../db';
+import { Transaction } from '@ckb-ccc/core';
 
 // Split receiver interface
 interface SplitReceiver {
@@ -139,19 +140,38 @@ export async function preparePayment(
 
 // Complete transfer
 export async function completeTransfer(paymentId: number, partSignedTx: string) {
+  // check payment transaction
+  const payment = await getPaymentById(paymentId);
+  if (!payment || !payment.tx_hash) {
+    throw new Error('Payment transaction hash not found');
+  }
+
+  const txObj = JSON.parse(partSignedTx);
+  const tx = Transaction.from(txObj);
+  const txHash = tx.hash();
+
+  // Check transaction hash
+  if (txHash !== payment.tx_hash) {
+    // if user use joyid sub device sign tx, the tx hash will be different
+    // check payment transaction
+    const isPayment = await isPaymentTx(tx, payment.platform_address_index, payment.amount);
+    if (!isPayment) {
+      throw new Error('Invalid payment transaction');
+    }
+  }
+
   // Update payment status to transfer
-  const payment = await updatePaymentStatusFromPrepareToTransfer(paymentId);
-  if (!payment) {
-    // Payment exists but not in expected state (prepare)
+  const result = await updatePaymentStatusFromPrepareToTransfer(paymentId, txHash);
+  if (!result) {
+    // Payment not exists or not in expected state (prepare)
     throw new Error('Payment not in prepare');
   }
 
   console.log('completeTransfer payment:', payment);
 
-  let txHash = "";
   try {
     // Complete transaction and send to chain
-    txHash = await completeTransaction(payment.platform_address_index, partSignedTx, payment.tx_hash!);
+    await completeTransaction(payment.platform_address_index, partSignedTx);
   } catch (error) {
     // Rollback payment status to prepare
     await updatePaymentStatusFromTransferToPrepare(paymentId);

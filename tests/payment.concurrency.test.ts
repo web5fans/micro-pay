@@ -59,7 +59,7 @@ async function testStatusTransitionRaceSafety() {
   );
 
   // Move to transfer (returns row)
-  const moved = await updatePaymentStatusFromPrepareToTransfer(created.id);
+  const moved = await updatePaymentStatusFromPrepareToTransfer(created.id, created.tx_hash);
   if (!moved || moved.status !== 1) {
     throw new Error('Failed to move payment to transfer');
   }
