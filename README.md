@@ -66,8 +66,8 @@ CREATE TABLE IF NOT EXISTS platform_address(
     id INTEGER PRIMARY KEY,
     index INTEGER,
     is_used BOOLEAN,
-    created_at TIMESTAMP,
-    updated_at TIMESTAMP
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 ```
 
@@ -90,8 +90,8 @@ CREATE TABLE IF NOT EXISTS payment(
     category INTEGER, // default 0, app define other category
     status INTEGER, // 0: prepare, 1: transfer, 2: complete, 3: cancel
     tx_hash TEXT,
-    created_at TIMESTAMP,
-    updated_at TIMESTAMP,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 );
 ```
 
@@ -115,8 +115,8 @@ CREATE TABLE IF NOT EXISTS account(
     category INTEGER, // default 0, app define other category
     status INTEGER, // 0: prepare, 1: (payment) complete, 2: cancel, 3: accounting, 4: accounted
     tx_hash TEXT,
-    created_at TIMESTAMP,
-    updated_at TIMESTAMP,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 );
 ```
 
