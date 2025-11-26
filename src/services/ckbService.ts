@@ -261,21 +261,11 @@ export async function isPaymentTx(tx: Transaction, platformAddressIndex: number,
   }
 }
 
-export async function completeTransaction(platformAddressIndex: number, partSignedTx: string, prepareTxHash: string, amount: number) {
+export async function completeTransaction(platformAddressIndex: number, partSignedTx: string) {
   try {
     const txObj = JSON.parse(partSignedTx);
 
     const tx = Transaction.from(txObj);
-
-    // Check transaction hash
-    if (tx.hash() !== prepareTxHash) {
-      // if user use joyid sub device sign tx, the tx hash will be different
-      // check payment transaction
-      const isPayment = await isPaymentTx(tx, platformAddressIndex, amount);
-      if (!isPayment) {
-        throw new Error('Invalid payment transaction');
-      }
-    }
 
     const platformPrivateKey = await getPrivateKey(platformAddressIndex);
     const platformSigner = new ccc.SignerCkbPrivateKey(cccClient, platformPrivateKey);
@@ -284,8 +274,7 @@ export async function completeTransaction(platformAddressIndex: number, partSign
     console.log('signedTx:', signedTx);
 
     const txHash = await cccClient.sendTransaction(signedTx);
-    
-    return txHash;
+    console.log('sendTransaction txHash:', txHash);
   } catch (error) {
     if (error instanceof Error) {
       console.error('Error completing transfer:', error.message);

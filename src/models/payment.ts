@@ -40,13 +40,13 @@ export async function createPaymentWithTransaction(
   return result.rows[0];
 }
 
-export async function updatePaymentStatusFromPrepareToTransfer(id: number): Promise<Payment> {
+export async function updatePaymentStatusFromPrepareToTransfer(id: number, tx_hash: string): Promise<Payment> {
   const result = await query(
     `UPDATE payment
-     SET status = 1, updated_at = NOW()
+     SET status = 1, updated_at = NOW(), tx_hash = $2
      WHERE id = $1 AND status = 0
      RETURNING *`,
-    [id] 
+    [id, tx_hash] 
   );
   
   return result.rows[0];  
@@ -185,9 +185,9 @@ export async function getTimeoutPayments(timeoutSeconds: number = 60): Promise<P
   return result.rows;
 }
 
-export async function getTransferPayments(): Promise<Payment[]> {
+export async function getTransferPaymentsUpdateBefore10Seconds(): Promise<Payment[]> {
   const result = await query(
-    `SELECT * FROM payment WHERE status = 1 ORDER BY created_at DESC`,
+    `SELECT * FROM payment WHERE status = 1 AND AGE(NOW(), updated_at) > INTERVAL '10 seconds' ORDER BY updated_at ASC`,
     []
   );
   
