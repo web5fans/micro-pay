@@ -166,8 +166,9 @@ export async function build2to2Transaction(
 
     // Collect all lock codehashes and remove duplicates
     const lockCodeHashes = new Set(inputCells.map((cell) => cell.cellOutput.lock.codeHash));
-    // Collect all cell dependencies
+    // Collect all cell dependencies (dedup by depType + outPoint)
     const cellDeps: CellDepLike[] = [];
+    const depKeys = new Set<string>();
     for (const codeHash of lockCodeHashes) {
       Object.entries(cccClient.scripts).forEach(([key, value]) => {
         if (!value) {
@@ -176,7 +177,12 @@ export async function build2to2Transaction(
         if (value.codeHash === codeHash) {
           // [{"cellDep":{"outPoint":{"txHash":"0xf8de3bb47d055cdf460d93a2a6e1b05f7432f9777c8c474abf4eec1d4aee5d37","index":0},"depType":"depGroup"}}]
           value.cellDeps.forEach((cellDepRecord) => {
-            cellDeps.push(cellDepRecord["cellDep"]);
+            const dep = cellDepRecord["cellDep"];
+            const key = `${dep.depType}:${dep.outPoint.txHash}:${dep.outPoint.index}`;
+            if (!depKeys.has(key)) {
+              depKeys.add(key);
+              cellDeps.push(dep);
+            }
           });
         }
       });
