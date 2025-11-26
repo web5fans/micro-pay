@@ -144,7 +144,10 @@ export async function build2to2Transaction(
     const platformCells = [];
     let platformSum = BigInt(0);
     for await (const cell of platformSigner.findCells(
-      {},
+      {
+        scriptLenRange: [0, 1],
+        outputDataLenRange: [0, 1],
+      },
       false,
       "asc",
       2,
@@ -228,7 +231,7 @@ export async function build2to2Transaction(
 
 
 // payment transaction check
-// 1. no typescript
+// 1. no typescript no data
 // 2. platform address increment check
 export async function isPaymentTx(tx: Transaction, platformAddressIndex: number, amount: number): Promise<boolean> {
   const platformAddress = platformAddresses[platformAddressIndex];
@@ -243,10 +246,19 @@ export async function isPaymentTx(tx: Transaction, platformAddressIndex: number,
       if (cell.cellOutput.type) {
         throw new Error('Type script not supported');
       }
+      if (cell.outputData != '0x' ) {
+        throw new Error('data not supported');
+      }
       const cellLock = cell.cellOutput.lock;
       const cellAddress = await Address.fromScript(cellLock, cccClient);
       if (cellAddress.toString() === platformAddress) {
         platformAddressInputSum += BigInt(cell.cellOutput.capacity);
+      }
+    }
+
+    for (const data of tx.outputsData) {
+      if (data != '0x' ) {
+        throw new Error('data not supported');
       }
     }
 
@@ -328,7 +340,10 @@ export async function AccountingTransaction(
         platformScript
       );
       for await (const cell of platformSigner.findCells(
-        {},
+        {
+          scriptLenRange: [0, 1],
+          outputDataLenRange: [0, 1],
+        },
         false,
         "asc",
         10,
