@@ -151,7 +151,7 @@ export async function completeTransfer(paymentId: number, partSignedTx: string) 
   let txHash = "";
   try {
     // Complete transaction and send to chain
-    txHash = await completeTransaction(payment.platform_address_index, partSignedTx, payment.tx_hash!);
+    txHash = await completeTransaction(payment.platform_address_index, partSignedTx, payment.tx_hash!, payment.amount);
   } catch (error) {
     // Rollback payment status to prepare
     await updatePaymentStatusFromTransferToPrepare(paymentId);
