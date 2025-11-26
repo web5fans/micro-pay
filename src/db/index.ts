@@ -49,8 +49,8 @@ export async function initDb() {
         info TEXT,
         status INTEGER NOT NULL DEFAULT 0,
         tx_hash TEXT,
-        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `, []);
     
@@ -69,8 +69,8 @@ export async function initDb() {
         info TEXT,
         status INTEGER NOT NULL DEFAULT 0,
         tx_hash TEXT,
-        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `, []);
     
@@ -81,8 +81,8 @@ export async function initDb() {
         address TEXT NOT NULL UNIQUE,
         index INTEGER,
         is_used BOOLEAN NOT NULL DEFAULT false,
-        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `, []);
 
