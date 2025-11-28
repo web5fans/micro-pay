@@ -169,9 +169,8 @@ export async function build2to2Transaction(
 
     // Collect all lock codehashes and remove duplicates
     const lockCodeHashes = new Set(inputCells.map((cell) => cell.cellOutput.lock.codeHash));
-    // Collect all cell dependencies (dedup by depType + outPoint)
-    const cellDeps: CellDepLike[] = [];
-    const depKeys = new Set<string>();
+    // Collect Known Script for cell dep
+    const knownScripts: KnownScript[] = [];
     for (const codeHash of lockCodeHashes) {
       Object.entries(cccClient.scripts).forEach(([key, value]) => {
         if (!value) {
@@ -179,14 +178,7 @@ export async function build2to2Transaction(
         }
         if (value.codeHash === codeHash) {
           // [{"cellDep":{"outPoint":{"txHash":"0xf8de3bb47d055cdf460d93a2a6e1b05f7432f9777c8c474abf4eec1d4aee5d37","index":0},"depType":"depGroup"}}]
-          value.cellDeps.forEach((cellDepRecord) => {
-            const dep = cellDepRecord["cellDep"];
-            const key = `${dep.depType}:${dep.outPoint.txHash}:${dep.outPoint.index}`;
-            if (!depKeys.has(key)) {
-              depKeys.add(key);
-              cellDeps.push(dep);
-            }
-          });
+          knownScripts.push(key as KnownScript);
         }
       });
     }
@@ -204,11 +196,14 @@ export async function build2to2Transaction(
 
     const tx = Transaction.from({
       version: 0,
-      cellDeps: cellDeps,
+      cellDeps: [],
       inputs: inputs,
       outputs: outputs,
       outputsData: [],
     });
+
+    // Add cell deps of known scripts
+    tx.addCellDepsOfKnownScripts(cccClient, ...knownScripts);
 
     // prepare witnesses
     await tx.prepareSighashAllWitness(senderAddr.script, 85, cccClient);
